@@ -40,7 +40,7 @@ pub fn generate_results_chart(votes: &[(i64, VoteChoice)]) -> String {
 
         let total_half_blocks = ((score / max_score) * max_bar_len * 2.0).round() as usize;
         let full_blocks = total_half_blocks / 2;
-        let has_half_block = total_half_blocks % 2 != 0;
+        let has_half_block = !total_half_blocks.is_multiple_of(2);
 
         let mut bar = "█".repeat(full_blocks);
         if has_half_block {

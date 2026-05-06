@@ -12,6 +12,7 @@ use crate::models::{guild, poll, vote};
 use crate::utils::renderer::generate_results_chart;
 
 /// runs every second, checking the cache.
+#[allow(clippy::too_many_lines)]
 pub async fn run_fast_loop(
     http: Arc<serenity::Http>,
     db: sea_orm::DatabaseConnection,
