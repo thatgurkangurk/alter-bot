@@ -39,7 +39,7 @@ pub struct DatabaseConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub bot: BotConfig,
-    pub db: DatabaseConfig
+    pub db: DatabaseConfig,
 }
 
 impl Config {

@@ -6,10 +6,15 @@ use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 use crate::{bot::create_bot, config::Config};
 
 mod bot;
+mod commands;
 mod config;
 mod consts;
-mod util;
 mod db;
+mod events;
+mod models;
+mod tasks;
+mod util;
+mod utils;
 
 fn print_startup_info() {
     info!("alter-bot version {} by gurkan", consts::VERSION);
