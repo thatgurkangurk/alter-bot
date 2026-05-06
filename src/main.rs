@@ -1,7 +1,14 @@
-use tracing::info;
+use std::path::Path;
+
+use tracing::{info, warn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
+use crate::{bot::create_bot, config::Config};
+
+mod bot;
+mod config;
 mod consts;
+mod util;
 
 fn print_startup_info() {
     info!("alter-bot version {} by gurkan", consts::VERSION);
@@ -9,7 +16,8 @@ fn print_startup_info() {
     info!("{}", &consts::REPOSITORY);
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,alter_bot=info"));
 
@@ -21,4 +29,33 @@ fn main() {
         .init();
 
     print_startup_info();
+
+    let default_path = Path::new(consts::DATA_DIR).join("alter-bot.toml");
+
+    if !default_path.exists() {
+        warn!("{} does not exist", default_path.display());
+
+        if std::env::var("CREATE_CONFIG_FILE_IF_NOT_EXIST").unwrap_or_default() == "1" {
+            warn!(
+                "creating an empty config file at: {}",
+                default_path.display()
+            );
+
+            if let Some(parent) = default_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+
+            std::fs::write(&default_path, "")?;
+        }
+    }
+
+    let config = Config::load(Some(&default_path))?;
+
+    let mut bot = create_bot(&config).await?;
+
+    if let Err(why) = bot.start().await {
+        tracing::error!("bot crashed: {:?}", why);
+    }
+
+    Ok(())
 }
