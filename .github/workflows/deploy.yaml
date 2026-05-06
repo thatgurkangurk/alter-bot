@@ -4,7 +4,8 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
+  packages: write
 
 env:
   REGISTRY: ghcr.io
@@ -20,11 +21,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
     steps:
+      - uses: actions/checkout@v4
+
       - id: commit
         name: Commit Hash
         uses: prompt/actions-commit-hash@v4
@@ -38,79 +37,57 @@ jobs:
             echo "VERSION=${{ steps.commit.outputs.short }}-unstable" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v6
-
-      # ------------------------
-      # Toolchain: mise & Rust
-      # ------------------------
       - name: Setup mise
         uses: jdx/mise-action@v4
         with:
-          install: true # Triggers installation from .mise.toml / .tool-versions
+          install: true
 
-      - name: Install Rust Target
-        shell: bash
-        run: rustup target add ${{ matrix.target }}
+      - name: Install mold & build-essential
+        run: sudo apt-get update && sudo apt-get install -y mold build-essential
 
-      # ------------------------
-      # Rust Cache
-      # ------------------------
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.target }}-fast
-          cache-all-crates: true
-
-      - name: Install mold
-        run: sudo apt-get install -y mold
-
-      - name: Install Build Dependencies
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-
-      - name: Rust Cache
-        uses: swatinem/rust-cache@v2
-        with:
-          key: musl-build
+          key: debian-gnu-fast
 
       - name: Build Release Binary
-        run: cargo build --release --target x86_64-unknown-linux-musl
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        run: cargo build --release
+        env:
+          RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v6.0.0
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ steps.commit.outputs.short }},enable=${{ github.ref_name == 'main' }}
-
-            # we test in production fellas
-            type=raw,value=we-test-in-production,enable=${{ github.ref_name == 'main' }}
-
-            # on version tag: use the tag itself (e.g., 0.0.1) and "latest"
+            type=raw,value=${{ steps.commit.outputs.short }}
+            type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
             type=ref,event=tag
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
       - name: Build and push
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v5
         with:
-          push: true
-          file: Dockerfile
           context: .
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             APP_VERSION=${{ steps.bin_version.outputs.VERSION }}
-          cache-from: |
-            type=gha,scope=main
-            type=gha,scope=${{ github.ref_name }}
-          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Trigger Coolify Webhook
         run: |
-          curl --request GET '${{ secrets.COOLIFY_WEBHOOK }}' --header 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}'
+          curl --request GET '${{ secrets.COOLIFY_WEBHOOK }}' \
+               --header 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}'
