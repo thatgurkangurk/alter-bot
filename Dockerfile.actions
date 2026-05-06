@@ -16,7 +16,7 @@ RUN groupadd -g 1000 alter && \
 
 RUN mkdir -p /app/data && chown alter:alter /app/data
 
-COPY target/release/alter-bot /usr/local/bin/alter-bot
+COPY ./deploy-out/alter-bot /usr/local/bin/alter-bot
 
 USER alter
 

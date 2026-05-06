@@ -51,7 +51,10 @@ jobs:
           key: debian-gnu-fast
 
       - name: Build Release Binary
-        run: cargo build --release
+        run: |
+          cargo build --release
+          mkdir -p ./deploy-out
+          cp target/release/alter-bot ./deploy-out/
         env:
           RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
 
