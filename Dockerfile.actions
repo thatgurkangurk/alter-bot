@@ -1,0 +1,25 @@
+FROM alpine:3.23.4 AS runtime
+
+RUN apk add --no-cache ca-certificates tzdata && \
+    update-ca-certificates
+
+WORKDIR /alter
+
+ARG UID=1000
+ARG GID=1000
+
+ARG APP_VERSION
+ENV APP_VERSION=$APP_VERSION
+
+ARG DATA_DIR="/app/data"
+
+RUN addgroup -g $GID -S alter && \
+    adduser -u $UID -S alter -G alter
+
+RUN mkdir -p /app/data && chown alter:alter /app/data
+
+COPY target/x86_64-unknown-linux-musl/release/alter-bot /usr/local/bin/alter-bot
+
+USER alter
+
+ENTRYPOINT ["/usr/local/bin/alter-bot"]

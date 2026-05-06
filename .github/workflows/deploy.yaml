@@ -1,0 +1,115 @@
+name: Build and Deploy
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: "thatgurkangurk/alter-bot"
+  CARGO_TERM_COLOR: always
+  BIN_NAME: alter-bot
+  MISE_EXPERIMENTAL: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - id: commit
+        name: Commit Hash
+        uses: prompt/actions-commit-hash@v4
+
+      - id: bin_version
+        name: Determine Binary Version
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "VERSION=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "VERSION=${{ steps.commit.outputs.short }}-unstable" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v6
+
+      # ------------------------
+      # Toolchain: mise & Rust
+      # ------------------------
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+        with:
+          install: true # Triggers installation from .mise.toml / .tool-versions
+
+      - name: Install Rust Target
+        shell: bash
+        run: rustup target add ${{ matrix.target }}
+
+      # ------------------------
+      # Rust Cache
+      # ------------------------
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}-fast
+          cache-all-crates: true
+
+      - name: Install mold
+        run: sudo apt-get install -y mold
+
+      - name: Install Build Dependencies
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          key: musl-build
+
+      - name: Build Release Binary
+        run: cargo build --release --target x86_64-unknown-linux-musl
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v6.0.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.commit.outputs.short }},enable=${{ github.ref_name == 'main' }}
+
+            # we test in production fellas
+            type=raw,value=we-test-in-production,enable=${{ github.ref_name == 'main' }}
+
+            # on version tag: use the tag itself (e.g., 0.0.1) and "latest"
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          push: true
+          file: Dockerfile
+          context: .
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ steps.bin_version.outputs.VERSION }}
+          cache-from: |
+            type=gha,scope=main
+            type=gha,scope=${{ github.ref_name }}
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
+
+      - name: Trigger Coolify Webhook
+        run: curl --request GET '${{ secrets.COOLIFY_WEBHOOK }}' --header 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}'

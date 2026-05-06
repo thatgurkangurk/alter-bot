@@ -1,0 +1,32 @@
+[package]
+name = "alter-bot"
+version = "0.1.0"
+edition = "2024"
+repository = "https://github.com/thatgurkangurk/alter-bot"
+license = "MPL-2.0"
+
+[dependencies]
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter"] }
+
+
+# --- Global Lint Rules ---
+[lints.rust]
+unsafe_code = "warn"
+
+[lints.clippy]
+# Set broad groups to a lower priority (-1) so exceptions can override them
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
+# Catch common panic-inducing methods
+unwrap_used = "warn"
+expect_used = "warn"
+todo = "warn"
+unimplemented = "warn"
+
+# --- Lint Exceptions ---
+# (These implicit priority 0 lints will now successfully override the -1 groups above)
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
