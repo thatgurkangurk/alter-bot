@@ -9,6 +9,7 @@ mod bot;
 mod config;
 mod consts;
 mod util;
+mod db;
 
 fn print_startup_info() {
     info!("alter-bot version {} by gurkan", consts::VERSION);

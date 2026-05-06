@@ -57,6 +57,7 @@ jobs:
           cp target/release/alter-bot ./deploy-out/
         env:
           RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
+          DATA_DIR: "/app/data"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

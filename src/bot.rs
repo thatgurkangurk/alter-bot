@@ -1,10 +1,13 @@
+use sea_orm::DatabaseConnection;
 use ::serenity::Client;
 use poise::serenity_prelude as serenity;
 use tracing::info;
 
-use crate::config::Config;
+use crate::{config::Config, db::create_db};
 
-struct Data {}
+struct Data {
+    pub db: DatabaseConnection
+}
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
@@ -34,6 +37,8 @@ async fn event_handler(
 pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
     let intents = serenity::GatewayIntents::GUILDS;
 
+    let db = create_db(config).await?;
+
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![info()],
@@ -45,7 +50,9 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(Data {})
+                Ok(Data {
+                    db
+                })
             })
         })
         .build();

@@ -11,8 +11,11 @@ ARG APP_VERSION
 ENV APP_VERSION=$APP_VERSION
 ARG DATA_DIR="/app/data"
 
-RUN groupadd -g 1000 alter && \
-    useradd -u 1000 -g alter -s /usr/sbin/nologin alter
+ARG UID=1000
+ARG GID=1000
+
+RUN groupadd -g ${GID} alter && \
+    useradd -u ${UID} -g alter -s /usr/sbin/nologin alter
 
 RUN mkdir -p /app/data && chown alter:alter /app/data
 
