@@ -112,4 +112,5 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
 
       - name: Trigger Coolify Webhook
-        run: curl --request GET '${{ secrets.COOLIFY_WEBHOOK }}' --header 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}'
+        run: |
+          curl --request GET '${{ secrets.COOLIFY_WEBHOOK }}' --header 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}'
