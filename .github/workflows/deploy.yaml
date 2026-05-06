@@ -86,6 +86,7 @@ jobs:
             APP_VERSION=${{ steps.bin_version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          file: Dockerfile.actions
 
       - name: Trigger Coolify Webhook
         run: |
