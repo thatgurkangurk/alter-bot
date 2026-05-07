@@ -6,7 +6,7 @@ use std::time::Duration;
 use tracing::error;
 
 use crate::bot::PollCache;
-use crate::models::{poll};
+use crate::models::poll;
 
 /// runs every second, checking the cache.
 #[allow(clippy::too_many_lines)]

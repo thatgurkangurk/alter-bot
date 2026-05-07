@@ -40,12 +40,22 @@ pub fn generate_results_chart(votes: &[(i64, VoteChoice)]) -> String {
         )
     };
 
+    let f = |n: f64| format!("{n:.1}").replace('.', ",");
+
     let outcome_text = if total_yes_score > total_no_score {
-        format!("**passed** (yes {total_yes_score} vs no {total_no_score})")
+        format!(
+            "**passed** (yes {} vs no {})",
+            f(total_yes_score),
+            f(total_no_score)
+        )
     } else if total_no_score > total_yes_score {
-        format!("**failed** (yes {total_yes_score} vs no {total_no_score})")
+        format!(
+            "**failed** (yes {} vs no {})",
+            f(total_yes_score),
+            f(total_no_score)
+        )
     } else {
-        format!("**tie** (score: {total_yes_score})")
+        format!("**tie** (score: {})", f(total_yes_score))
     };
 
     format!(
