@@ -50,6 +50,7 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
             commands: vec![
                 info(),
                 commands::polls::start_member_poll(),
+                commands::polls::end_poll_command(),
                 commands::settings::settings(),
                 commands::settings::set_log_channel(),
             ],

@@ -1,6 +1,6 @@
 use chrono::{Duration, Utc};
 use poise::serenity_prelude as serenity;
-use sea_orm::{ActiveModelTrait, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
 use crate::bot::{Context, Error};
@@ -8,6 +8,52 @@ use crate::emojis::{HARD_NO, NO, YES};
 use crate::models::poll;
 use crate::utils::embeds::build_poll_embed;
 
+#[poise::command(
+    context_menu_command = "End Poll",
+    required_permissions = "ADMINISTRATOR",
+    guild_only
+)]
+pub async fn end_poll_command(
+    ctx: crate::bot::Context<'_>,
+    #[description = "The poll message to end"] message: serenity::Message,
+) -> Result<(), Error> {
+    let msg_id = message.id.get().cast_signed();
+
+    let poll_opt = poll::Entity::find()
+        .filter(poll::Column::MessageId.eq(Some(msg_id)))
+        .filter(poll::Column::IsActive.eq(true))
+        .one(&ctx.data().db)
+        .await?;
+
+    match poll_opt {
+        Some(poll_model) => {
+            ctx.send(
+                poise::CreateReply::default()
+                    .content("closing the poll...")
+                    .ephemeral(true),
+            )
+            .await?;
+
+            crate::utils::poll_logic::close_and_finalize_poll(
+                ctx.http(),
+                &ctx.data().db,
+                &ctx.data().cache,
+                poll_model,
+            )
+            .await?;
+        }
+        None => {
+            ctx.send(
+                poise::CreateReply::default()
+                    .content("❌ that message isn't an active poll.")
+                    .ephemeral(true),
+            )
+            .await?;
+        }
+    }
+
+    Ok(())
+}
 /// start a new member poll
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn start_member_poll(
