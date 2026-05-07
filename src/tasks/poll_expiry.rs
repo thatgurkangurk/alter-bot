@@ -1,4 +1,3 @@
-use ::serenity::model::Colour;
 use chrono::Utc;
 use poise::serenity_prelude as serenity;
 use sea_orm::{ActiveModelTrait, ColumnTrait, QueryFilter, Set, entity::prelude::*};
@@ -8,6 +7,7 @@ use std::time::Duration;
 use tracing::error;
 
 use crate::bot::PollCache;
+use crate::emojis::{HARD_NO, NO, YES};
 use crate::models::{guild, poll, vote};
 use crate::utils::renderer::generate_results_chart;
 
@@ -73,10 +73,14 @@ pub async fn run_fast_loop(
 
             let chart = generate_results_chart(&vote_data);
 
+            let description = format!(
+                "### {}\n\n### **choices**\n{} yes\n{} no\n{} hard no\n\n### **result**\n{}",
+                active_poll.title, YES.text, NO.text, HARD_NO.text, chart
+            );
+
             let results_embed = serenity::CreateEmbed::new()
-                .title(format!("poll closed: {}", active_poll.title))
-                .description(&chart)
-                .color(Colour::RED);
+                .description(description)
+                .color(serenity::Colour::RED);
 
             if let Some(msg_id) = active_poll.message_id {
                 let channel_id = serenity::ChannelId::new(active_poll.channel_id.cast_unsigned());

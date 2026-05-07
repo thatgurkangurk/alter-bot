@@ -10,6 +10,7 @@ mod commands;
 mod config;
 mod consts;
 mod db;
+mod emojis;
 mod events;
 mod models;
 mod tasks;

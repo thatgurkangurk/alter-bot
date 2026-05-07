@@ -4,6 +4,7 @@ use sea_orm::{ActiveModelTrait, Set};
 use uuid::Uuid;
 
 use crate::bot::{Context, Error};
+use crate::emojis::{HARD_NO, NO, YES};
 use crate::models::poll;
 use crate::utils::embeds::build_poll_embed;
 
@@ -22,13 +23,13 @@ pub async fn start_member_poll(
 
     let components = vec![serenity::CreateActionRow::Buttons(vec![
         serenity::CreateButton::new(format!("vote_Yes_{poll_id}"))
-            .label("yes")
-            .style(serenity::ButtonStyle::Success),
+            .emoji(YES.id)
+            .style(serenity::ButtonStyle::Secondary),
         serenity::CreateButton::new(format!("vote_No_{poll_id}"))
-            .label("no")
-            .style(serenity::ButtonStyle::Danger),
+            .emoji(NO.id)
+            .style(serenity::ButtonStyle::Secondary),
         serenity::CreateButton::new(format!("vote_HardNo_{poll_id}"))
-            .label("hard no")
+            .emoji(HARD_NO.id)
             .style(serenity::ButtonStyle::Secondary),
     ])];
 
