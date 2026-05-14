@@ -1,31 +1,38 @@
-use ::serenity::model::Colour;
+use crate::emojis::{HARD_NO, NO, YES};
 use chrono::{DateTime, Utc};
 use poise::serenity_prelude as serenity;
-
-use crate::emojis::{HARD_NO, NO, YES};
 
 pub fn build_poll_embed(
     title: &str,
     ends_at: DateTime<Utc>,
     total_votes: u64,
+    include_hard_no: bool,
 ) -> serenity::CreateEmbed {
     let timestamp = format!("<t:{}:R>", ends_at.timestamp());
 
-    let description = [
+    // Assemble the body line-by-line dynamically
+    let mut description_lines = vec![
         format!("### {title}"),
-        String::new(), // blank line
+        String::new(),
         "### **choices**".to_string(),
         format!("{} yes", YES.text),
         format!("{} no", NO.text),
-        format!("{} hard no", HARD_NO.text),
-        String::new(),
-        format!("please cast your vote below.\nthis poll ends {timestamp}."),
-    ]
-    .join("\n");
+    ];
+
+    if include_hard_no {
+        description_lines.push(format!("{} hard no", HARD_NO.text));
+    }
+
+    description_lines.push(String::new());
+    description_lines.push(format!(
+        "please cast your vote below.\nthis poll ends {timestamp}."
+    ));
+
+    let description = description_lines.join("\n");
 
     serenity::CreateEmbed::new()
         .description(description)
-        .color(Colour::ORANGE)
+        .color(serenity::Colour::ORANGE)
         .footer(serenity::CreateEmbedFooter::new(format!(
             "current voters: {total_votes}"
         )))

@@ -16,13 +16,14 @@ pub async fn handle(
     data: &Data,
 ) -> Result<(), Error> {
     if let serenity::FullEvent::InteractionCreate { interaction } = event
-        && let Some(component) = interaction.as_message_component() {
-            let custom_id = &component.data.custom_id;
+        && let Some(component) = interaction.as_message_component()
+    {
+        let custom_id = &component.data.custom_id;
 
-            if custom_id.starts_with("vote_") {
-                return handle_vote_button(ctx, component, data).await;
-            }
+        if custom_id.starts_with("vote_") {
+            return handle_vote_button(ctx, component, data).await;
         }
+    }
     Ok(())
 }
 
@@ -108,7 +109,7 @@ async fn handle_vote_button(
         .await?;
 
     let ends_at_utc = p.ends_at.with_timezone(&Utc);
-    let updated_embed = build_poll_embed(&p.title, ends_at_utc, total_votes);
+    let updated_embed = build_poll_embed(&p.title, ends_at_utc, total_votes, p.has_hard_no);
 
     let response = serenity::CreateInteractionResponseMessage::new().embed(updated_embed);
     component

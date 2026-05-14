@@ -12,6 +12,8 @@ pub struct Model {
     pub title: String,
     pub ends_at: DateTimeWithTimeZone, // maps to postgres TIMESTAMPTZ
     pub is_active: bool,
+    #[sea_orm(default_value = true)] // for existing ones that don't have it explicitly set
+    pub has_hard_no: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

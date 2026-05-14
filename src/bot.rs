@@ -49,7 +49,7 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
         .options(poise::FrameworkOptions {
             commands: vec![
                 info(),
-                commands::polls::start_member_poll(),
+                commands::polls::start_poll(),
                 commands::polls::end_poll_command(),
                 commands::polls::check_poll_status(),
                 commands::settings::settings(),

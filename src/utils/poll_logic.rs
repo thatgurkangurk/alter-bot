@@ -26,7 +26,7 @@ pub async fn close_and_finalize_poll(
     let vote_data: Vec<(i64, vote::VoteChoice)> =
         votes.into_iter().map(|v| (v.user_id, v.choice)).collect();
 
-    let chart = generate_results_chart(&vote_data);
+    let chart = generate_results_chart(&vote_data, poll_model.has_hard_no);
 
     let description = format!(
         "### {}\n\n### **choices**\n{} yes\n{} no\n{} hard no\n\n### **result**\n{}",

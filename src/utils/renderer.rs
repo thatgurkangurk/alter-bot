@@ -2,7 +2,7 @@ use crate::emojis::{HARD_NO, NO, YES};
 use crate::models::vote::VoteChoice;
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-pub fn generate_results_chart(votes: &[(i64, VoteChoice)]) -> String {
+pub fn generate_results_chart(votes: &[(i64, VoteChoice)], has_hard_no: bool) -> String {
     let mut yes_count = 0;
     let mut no_count = 0;
     let mut hard_no_count = 0;
@@ -58,21 +58,25 @@ pub fn generate_results_chart(votes: &[(i64, VoteChoice)]) -> String {
         format!("**tie** (score: {})", f(total_yes_score))
     };
 
-    format!(
-        "{} {} | {} votes\n\
-         {} {} | {} votes\n\
-         {} {} | {} votes (weighted 1,5)\n\n\
-         **outcome:**\n\
-         {outcome_text}\n\n\
-         *{total_votes} votes from {total_votes} users*",
-        YES.text,
-        make_bar(yes_score),
-        yes_count,
-        NO.text,
-        make_bar(no_score),
-        no_count,
-        HARD_NO.text,
-        make_bar(hard_no_score),
-        hard_no_count
-    )
+    let mut lines = vec![
+        format!("{} {} | {} votes", YES.text, make_bar(yes_score), yes_count),
+        format!("{} {} | {} votes", NO.text, make_bar(no_score), no_count),
+    ];
+
+    if has_hard_no {
+        lines.push(format!(
+            "{} {} | {} votes (weighted 1,5)",
+            HARD_NO.text,
+            make_bar(hard_no_score),
+            hard_no_count
+        ));
+    }
+
+    lines.push(String::new());
+    lines.push("**outcome:**".to_string());
+    lines.push(outcome_text);
+    lines.push(String::new());
+    lines.push(format!("*{total_votes} votes from {total_votes} users*"));
+
+    lines.join("\n")
 }

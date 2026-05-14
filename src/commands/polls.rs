@@ -90,7 +90,7 @@ pub async fn check_poll_status(
     let vote_data: Vec<(i64, vote::VoteChoice)> =
         votes.into_iter().map(|v| (v.user_id, v.choice)).collect();
 
-    let chart = generate_results_chart(&vote_data);
+    let chart = generate_results_chart(&vote_data, active_poll.has_hard_no);
 
     let mut yes_votes = Vec::new();
     let mut no_votes = Vec::new();
@@ -128,19 +128,23 @@ pub async fn check_poll_status(
     let no_list = format_users(no_votes).await;
     let hard_no_list = format_users(hard_no_votes).await;
 
-    let description = [
+    let mut description_lines = vec![
         "### live results".to_string(),
         chart,
         String::new(), // blank line
         "### **voter breakdown**".to_string(),
-        crate::emojis::YES.text.to_string(),
+        format!("{}", crate::emojis::YES.text),
         yes_list,
-        crate::emojis::NO.text.to_string(),
+        format!("{}", crate::emojis::NO.text),
         no_list,
-        crate::emojis::HARD_NO.text.to_string(),
-        hard_no_list,
-    ]
-    .join("\n");
+    ];
+
+    if active_poll.has_hard_no {
+        description_lines.push(crate::emojis::HARD_NO.text.to_string());
+        description_lines.push(hard_no_list);
+    }
+
+    let description = description_lines.join("\n");
 
     let status_embed = serenity::CreateEmbed::new()
         .title(format!("live status: {}", active_poll.title))
@@ -153,32 +157,43 @@ pub async fn check_poll_status(
     Ok(())
 }
 
-/// start a new member poll
+/// start a new poll
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
-pub async fn start_member_poll(
+pub async fn start_poll(
     ctx: Context<'_>,
     #[description = "poll title"] poll_title: String,
     #[description = "channel to post the poll in"] target_channel: serenity::GuildChannel,
     #[description = "how long the poll should run (in minutes)"] duration_minutes: i64,
+    #[description = "include the 'hard no' option? (defaults to false)"] include_hard_no: Option<
+        bool,
+    >,
 ) -> Result<(), Error> {
+    let include_hard_no = include_hard_no.unwrap_or(false);
     let ends_at = Utc::now() + Duration::minutes(duration_minutes);
     let guild_id = ctx.guild_id().ok_or("must be run in a guild")?;
 
     let poll_id = Uuid::new_v4();
 
-    let components = vec![serenity::CreateActionRow::Buttons(vec![
+    let mut buttons = vec![
         serenity::CreateButton::new(format!("vote_Yes_{poll_id}"))
             .emoji(YES.id)
             .style(serenity::ButtonStyle::Secondary),
         serenity::CreateButton::new(format!("vote_No_{poll_id}"))
             .emoji(NO.id)
             .style(serenity::ButtonStyle::Secondary),
-        serenity::CreateButton::new(format!("vote_HardNo_{poll_id}"))
-            .emoji(HARD_NO.id)
-            .style(serenity::ButtonStyle::Secondary),
-    ])];
+    ];
 
-    let embed = build_poll_embed(&poll_title, ends_at, 0);
+    if include_hard_no {
+        buttons.push(
+            serenity::CreateButton::new(format!("vote_HardNo_{poll_id}"))
+                .emoji(HARD_NO.id)
+                .style(serenity::ButtonStyle::Secondary),
+        );
+    }
+
+    let components = vec![serenity::CreateActionRow::Buttons(buttons)];
+
+    let embed = build_poll_embed(&poll_title, ends_at, 0, include_hard_no);
 
     let poll_message = serenity::CreateMessage::new()
         .embed(embed)
@@ -197,6 +212,7 @@ pub async fn start_member_poll(
         title: Set(poll_title),
         ends_at: Set(ends_at.into()),
         is_active: Set(true),
+        has_hard_no: Set(include_hard_no),
     };
 
     new_poll.insert(&ctx.data().db).await?;
