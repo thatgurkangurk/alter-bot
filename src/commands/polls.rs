@@ -1,12 +1,14 @@
 use chrono::{Duration, Utc};
 use poise::serenity_prelude as serenity;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use std::fmt::Write;
 use uuid::Uuid;
 
 use crate::bot::{Context, Error};
 use crate::emojis::{HARD_NO, NO, YES};
-use crate::models::poll;
+use crate::models::{poll, vote};
 use crate::utils::embeds::build_poll_embed;
+use crate::utils::renderer::generate_results_chart;
 
 #[poise::command(
     context_menu_command = "End Poll",
@@ -54,6 +56,103 @@ pub async fn end_poll_command(
 
     Ok(())
 }
+
+/// check the current results and voters of a poll without closing it
+#[poise::command(
+    context_menu_command = "Check Poll Status",
+    required_permissions = "ADMINISTRATOR",
+    guild_only
+)]
+pub async fn check_poll_status(
+    ctx: Context<'_>,
+    #[description = "The poll message to check"] message: serenity::Message,
+) -> Result<(), Error> {
+    ctx.defer_ephemeral().await?;
+
+    let msg_id = message.id.get().cast_signed();
+
+    let poll_opt = poll::Entity::find()
+        .filter(poll::Column::MessageId.eq(Some(msg_id)))
+        .one(&ctx.data().db)
+        .await?;
+
+    let Some(active_poll) = poll_opt else {
+        ctx.send(poise::CreateReply::default().content("that message is not a poll"))
+            .await?;
+        return Ok(());
+    };
+
+    let votes = vote::Entity::find()
+        .filter(vote::Column::PollId.eq(active_poll.id))
+        .all(&ctx.data().db)
+        .await?;
+
+    let vote_data: Vec<(i64, vote::VoteChoice)> =
+        votes.into_iter().map(|v| (v.user_id, v.choice)).collect();
+
+    let chart = generate_results_chart(&vote_data);
+
+    let mut yes_votes = Vec::new();
+    let mut no_votes = Vec::new();
+    let mut hard_no_votes = Vec::new();
+
+    for (user_id, choice) in &vote_data {
+        match choice {
+            vote::VoteChoice::Yes => yes_votes.push(*user_id),
+            vote::VoteChoice::No => no_votes.push(*user_id),
+            vote::VoteChoice::HardNo => hard_no_votes.push(*user_id),
+        }
+    }
+
+    let guild_id = ctx.guild_id().ok_or("no guild id")?;
+    let http = ctx.http();
+
+    let format_users = |users: Vec<i64>| async move {
+        if users.is_empty() {
+            return "nobody yet\n".to_string();
+        }
+
+        let mut list = String::new();
+        for id in users {
+            let uid = serenity::UserId::new(id.cast_unsigned());
+            let name = guild_id.member(http, uid).await.map_or_else(
+                |_| format!("unknown user ({id})"),
+                |m| m.display_name().to_owned(),
+            );
+            let _ = writeln!(list, "- {name}");
+        }
+        list
+    };
+
+    let yes_list = format_users(yes_votes).await;
+    let no_list = format_users(no_votes).await;
+    let hard_no_list = format_users(hard_no_votes).await;
+
+    let description = [
+        "### live results".to_string(),
+        chart,
+        String::new(), // blank line
+        "### **voter breakdown**".to_string(),
+        crate::emojis::YES.text.to_string(),
+        yes_list,
+        crate::emojis::NO.text.to_string(),
+        no_list,
+        crate::emojis::HARD_NO.text.to_string(),
+        hard_no_list,
+    ]
+    .join("\n");
+
+    let status_embed = serenity::CreateEmbed::new()
+        .title(format!("live status: {}", active_poll.title))
+        .description(description)
+        .color(serenity::Colour::BLUE);
+
+    ctx.send(poise::CreateReply::default().embed(status_embed))
+        .await?;
+
+    Ok(())
+}
+
 /// start a new member poll
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
 pub async fn start_member_poll(
