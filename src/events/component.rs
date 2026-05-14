@@ -5,7 +5,6 @@ use sea_orm::{Set, entity::prelude::*};
 use uuid::Uuid;
 
 use crate::bot::{Data, Error};
-use crate::consts;
 use crate::models::{poll, vote, voter_ban};
 use crate::utils::embeds::build_poll_embed;
 
@@ -33,21 +32,6 @@ async fn handle_vote_button(
     data: &Data,
 ) -> Result<(), Error> {
     let custom_id = &component.data.custom_id;
-    let role = consts::ELIGIBLE_TO_VOTE_ROLE_ID;
-
-    let has_permission = component
-        .member
-        .as_ref()
-        .is_some_and(|member| member.roles.contains(&role));
-
-    if !has_permission {
-        return reply_ephemeral(
-            ctx,
-            component,
-            "you are not eligible to vote in this server.",
-        )
-        .await;
-    }
 
     let parts: Vec<&str> = custom_id.split('_').collect();
     if parts.len() != 3 {
@@ -81,6 +65,23 @@ async fn handle_vote_button(
         return reply_ephemeral(ctx, component, "that poll wasn't found").await;
     };
 
+    let has_permission = p.required_role_id.is_none_or(|role_id| {
+        let role = serenity::RoleId::new(role_id.cast_unsigned());
+        component
+            .member
+            .as_ref()
+            .is_some_and(|member| member.roles.contains(&role))
+    });
+
+    if !has_permission {
+        return reply_ephemeral(
+            ctx,
+            component,
+            "you don't have the required role to vote on this poll.",
+        )
+        .await;
+    }
+
     let choice = match choice_str {
         "Yes" => vote::VoteChoice::Yes,
         "No" => vote::VoteChoice::No,
@@ -108,8 +109,13 @@ async fn handle_vote_button(
         .count(&data.db)
         .await?;
 
+    let role_opt = p
+        .required_role_id
+        .map(|id| serenity::RoleId::new(id as u64));
+
     let ends_at_utc = p.ends_at.with_timezone(&Utc);
-    let updated_embed = build_poll_embed(&p.title, ends_at_utc, total_votes, p.has_hard_no);
+    let updated_embed =
+        build_poll_embed(&p.title, ends_at_utc, total_votes, p.has_hard_no, role_opt);
 
     let response = serenity::CreateInteractionResponseMessage::new().embed(updated_embed);
     component

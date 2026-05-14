@@ -1,5 +1,4 @@
 use crate::bot::Error;
-use crate::emojis::{HARD_NO, NO, YES};
 use crate::models::{guild, poll, vote};
 use crate::utils::renderer::generate_results_chart;
 use poise::serenity_prelude as serenity;
@@ -38,6 +37,12 @@ pub async fn close_and_finalize_poll(
 
     if poll_model.has_hard_no {
         description_lines.push(crate::emojis::HARD_NO.text.to_string());
+    }
+
+    if let Some(role_id) = poll_model.required_role_id {
+        description_lines.push(String::new());
+        description_lines.push("### **required role**".to_string());
+        description_lines.push(format!("<@&{role_id}>"));
     }
 
     description_lines.push(String::new());

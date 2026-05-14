@@ -7,6 +7,7 @@ pub fn build_poll_embed(
     ends_at: DateTime<Utc>,
     total_votes: u64,
     include_hard_no: bool,
+    required_role: Option<serenity::RoleId>,
 ) -> serenity::CreateEmbed {
     let timestamp = format!("<t:{}:R>", ends_at.timestamp());
 
@@ -21,6 +22,12 @@ pub fn build_poll_embed(
 
     if include_hard_no {
         description_lines.push(format!("{} hard no", HARD_NO.text));
+    }
+
+    if let Some(role_id) = required_role {
+        description_lines.push(String::new());
+        description_lines.push("### **required role**".to_string());
+        description_lines.push(format!("<@&{role_id}>"));
     }
 
     description_lines.push(String::new());

@@ -14,6 +14,8 @@ pub struct Model {
     pub is_active: bool,
     #[sea_orm(default_value = true)] // for existing ones that don't have it explicitly set
     pub has_hard_no: bool,
+
+    pub required_role_id: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

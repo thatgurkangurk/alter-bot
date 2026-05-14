@@ -144,6 +144,12 @@ pub async fn check_poll_status(
         description_lines.push(hard_no_list);
     }
 
+    if let Some(role_id) = active_poll.required_role_id {
+        description_lines.push(String::new());
+        description_lines.push("### **required role**".to_string());
+        description_lines.push(format!("<@&{role_id}>"));
+    }
+
     let description = description_lines.join("\n");
 
     let status_embed = serenity::CreateEmbed::new()
@@ -166,6 +172,9 @@ pub async fn start_poll(
     #[description = "how long the poll should run (in minutes)"] duration_minutes: i64,
     #[description = "include the 'hard no' option? (defaults to false)"] include_hard_no: Option<
         bool,
+    >,
+    #[description = "a role that members must have to vote (optional)"] required_role_id: Option<
+        serenity::RoleId,
     >,
 ) -> Result<(), Error> {
     let include_hard_no = include_hard_no.unwrap_or(false);
@@ -193,7 +202,7 @@ pub async fn start_poll(
 
     let components = vec![serenity::CreateActionRow::Buttons(buttons)];
 
-    let embed = build_poll_embed(&poll_title, ends_at, 0, include_hard_no);
+    let embed = build_poll_embed(&poll_title, ends_at, 0, include_hard_no, required_role_id);
 
     let poll_message = serenity::CreateMessage::new()
         .embed(embed)
@@ -213,6 +222,7 @@ pub async fn start_poll(
         ends_at: Set(ends_at.into()),
         is_active: Set(true),
         has_hard_no: Set(include_hard_no),
+        required_role_id: Set(required_role_id.map(|r| r.get().cast_signed())),
     };
 
     new_poll.insert(&ctx.data().db).await?;
