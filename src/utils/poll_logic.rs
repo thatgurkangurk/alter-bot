@@ -28,10 +28,23 @@ pub async fn close_and_finalize_poll(
 
     let chart = generate_results_chart(&vote_data, poll_model.has_hard_no);
 
-    let description = format!(
-        "### {}\n\n### **choices**\n{} yes\n{} no\n{} hard no\n\n### **result**\n{}",
-        poll_model.title, YES.text, NO.text, HARD_NO.text, chart
-    );
+    let mut description_lines = vec![
+        format!("### {}", poll_model.title),
+        String::new(), // blank line
+        "### **choices**".to_string(),
+        crate::emojis::YES.text.to_string(),
+        crate::emojis::NO.text.to_string(),
+    ];
+
+    if poll_model.has_hard_no {
+        description_lines.push(crate::emojis::HARD_NO.text.to_string());
+    }
+
+    description_lines.push(String::new());
+    description_lines.push("### **result**".to_string());
+    description_lines.push(chart);
+
+    let description = description_lines.join("\n");
 
     let results_embed = serenity::CreateEmbed::new()
         .description(description)
