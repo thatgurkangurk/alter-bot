@@ -54,6 +54,7 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
                 commands::polls::check_poll_status(),
                 commands::settings::settings(),
                 commands::settings::set_log_channel(),
+                commands::minecraft::server_status(),
             ],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(async move {
