@@ -5,6 +5,7 @@ use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 use crate::{bot::create_bot, config::Config};
 
+mod awty;
 mod bot;
 mod commands;
 mod config;

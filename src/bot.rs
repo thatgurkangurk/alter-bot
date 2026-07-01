@@ -55,11 +55,13 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
                 commands::settings::settings(),
                 commands::settings::set_log_channel(),
                 commands::minecraft::server_status(),
+                commands::awty::are_we_there_yet(),
             ],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(async move {
                     event_handler(ctx, event, framework, data).await?;
-                    crate::events::component::handle(ctx, event, framework, data).await
+                    crate::events::component::handle(ctx, event, framework, data).await?;
+                    crate::awty::event::handle_persistent_buttons(ctx, event).await
                 })
             },
             ..Default::default()
