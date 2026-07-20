@@ -98,7 +98,6 @@ jobs:
           cache-to: type=gha,mode=max
           file: Dockerfile.actions
 
-      - name: Trigger Coolify Webhook
+      - name: Trigger Deploy Webhook
         run: |
-          curl --request GET '${{ secrets.COOLIFY_WEBHOOK }}' \
-               --header 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}'
+          curl --request POST '${{ secrets.DEPLOY_WEBHOOK }}'
