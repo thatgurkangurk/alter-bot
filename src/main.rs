@@ -15,9 +15,11 @@ mod models;
 mod util;
 
 fn print_startup_info() {
+    info!("==========================================");
     info!("alter-bot version {} by gurkan", consts::VERSION);
     info!("MPL 2.0 license");
     info!("{}", &consts::REPOSITORY);
+    info!("==========================================");
 }
 
 #[tokio::main]
