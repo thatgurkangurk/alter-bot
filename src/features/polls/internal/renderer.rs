@@ -45,6 +45,8 @@ pub fn generate_results_chart(options: &[poll_option::Model], votes: &[vote::Mod
 
     let mut lines = Vec::new();
 
+    let total_score: f64 = option_results.iter().map(|(_, _, score)| *score).sum();
+
     for (index, (opt, count, score)) in option_results.iter().enumerate() {
         let index_u32 = u32::try_from(index).unwrap_or(0);
 
@@ -53,11 +55,18 @@ pub fn generate_results_chart(options: &[poll_option::Model], votes: &[vote::Mod
 
         let weight_text = format!(" (weighted {:.2})", opt.weight);
 
+        let percentage = if total_score > 0.0 {
+            (*score / total_score) * 100.0
+        } else {
+            0.0
+        };
+
         lines.push(format!(
-            "{} {} | {} votes{}",
+            "{} {} | {} votes ({:.1}% score){}",
             prefix,
             make_bar(*score),
             count,
+            percentage,
             weight_text
         ));
     }
