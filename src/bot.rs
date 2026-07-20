@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{commands, config::Config, db::create_db, features};
+use crate::{config::Config, db::create_db, features};
 
 pub type PollCache = Arc<RwLock<HashMap<Uuid, DateTime<Utc>>>>;
 pub struct Data {
@@ -45,14 +45,11 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
 
     let db = create_db(config).await?;
 
-    let commands = vec![
-        info(),
-        commands::minecraft::server_status(),
-        features::awty::are_we_there_yet(),
-    ];
+    let commands = vec![info(), features::awty::are_we_there_yet()];
 
     let commands = features::polls::commands(commands);
     let commands = features::settings::commands(commands);
+    let commands = features::minecraft::commands(commands);
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
