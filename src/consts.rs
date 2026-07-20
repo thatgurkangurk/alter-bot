@@ -5,6 +5,7 @@ pub const VERSION: &str = match option_env!("APP_VERSION") {
 
 pub const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
+#[allow(dead_code)]
 /// split this on ':'
 pub const AUTHORS_RAW: &str = env!("CARGO_PKG_AUTHORS");
 
