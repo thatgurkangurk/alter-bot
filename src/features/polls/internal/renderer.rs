@@ -54,11 +54,7 @@ pub fn generate_results_chart(options: &[poll_option::Model], votes: &[vote::Mod
             _ => "🔹",
         };
 
-        let weight_text = if (opt.weight - 1.0).abs() > f64::EPSILON {
-            format!(" (weighted {})", f(opt.weight))
-        } else {
-            String::new()
-        };
+        let weight_text = format!(" (weighted {})", f(opt.weight));
 
         lines.push(format!(
             "{} {} | {} votes{}",
