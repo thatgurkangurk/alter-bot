@@ -151,6 +151,11 @@ async fn ensure_guild_exists(db: &sea_orm::DatabaseConnection, guild_id: i64) ->
     Ok(())
 }
 
-pub fn settings_commands() -> Vec<poise::Command<Data, Error>> {
-    vec![settings(), set_log_channel()]
+pub fn settings_commands(
+    mut cmds: Vec<poise::Command<Data, Error>>,
+) -> Vec<poise::Command<Data, Error>> {
+    cmds.push(settings());
+    cmds.push(set_log_channel());
+
+    cmds
 }

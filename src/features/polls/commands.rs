@@ -242,6 +242,12 @@ async fn start_poll(
     Ok(())
 }
 
-pub fn poll_commands() -> Vec<poise::Command<Data, Error>> {
-    vec![start_poll(), end_poll_command(), check_poll_status()]
+pub fn poll_commands(
+    mut cmds: Vec<poise::Command<Data, Error>>,
+) -> Vec<poise::Command<Data, Error>> {
+    cmds.push(start_poll());
+    cmds.push(end_poll_command());
+    cmds.push(check_poll_status());
+
+    cmds
 }
