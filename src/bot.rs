@@ -52,7 +52,7 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
     ];
 
     let commands = features::polls::commands(commands);
-    let commands = commands::settings::settings_commands(commands);
+    let commands = features::settings::commands(commands);
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
