@@ -197,7 +197,7 @@ async fn start_poll(
 
         let parts: Vec<&str> = raw.split(':').collect();
         let label = parts[0].trim().to_string();
-        let weight_opt = parts.get(1).map(ToString::to_string);
+        let weight_opt = parts.get(1).map(|s| s.trim().to_string());
         let weight = parse_weight(weight_opt);
 
         let opt_id = Uuid::new_v4();
