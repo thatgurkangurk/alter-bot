@@ -64,7 +64,7 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
             event_handler: |ctx, event, framework, data| {
                 Box::pin(async move {
                     event_handler(ctx, event, framework, data).await?;
-                    crate::events::component::handle(ctx, event, framework, data).await?;
+                    features::polls::event_handler(ctx, event, framework, data).await?;
                     features::awty::handle_persistent_buttons(ctx, event).await
                 })
             },

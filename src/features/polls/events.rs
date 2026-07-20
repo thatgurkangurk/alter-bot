@@ -4,11 +4,11 @@ use sea_orm::sea_query::OnConflict;
 use sea_orm::{Set, entity::prelude::*};
 use uuid::Uuid;
 
+use super::internal::embed::build_poll_embed;
 use crate::bot::{Data, Error};
 use crate::models::{poll, vote, voter_ban};
-use crate::utils::embeds::build_poll_embed;
 
-pub async fn handle(
+pub async fn event_handler(
     ctx: &serenity::Context,
     event: &serenity::FullEvent,
     _framework: poise::FrameworkContext<'_, Data, Error>,

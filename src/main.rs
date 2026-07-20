@@ -11,11 +11,9 @@ mod config;
 mod consts;
 mod db;
 mod emojis;
-mod events;
 mod features;
 mod models;
 mod util;
-mod utils;
 
 fn print_startup_info() {
     info!("alter-bot version {} by gurkan", consts::VERSION);

@@ -4,11 +4,11 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use std::fmt::Write;
 use uuid::Uuid;
 
+use super::internal::embed::build_poll_embed;
+use super::internal::renderer::generate_results_chart;
 use crate::bot::{Context, Data, Error};
 use crate::emojis::{HARD_NO, NO, YES};
 use crate::models::{poll, vote};
-use crate::utils::embeds::build_poll_embed;
-use crate::utils::renderer::generate_results_chart;
 
 #[poise::command(
     context_menu_command = "End Poll",
@@ -36,7 +36,7 @@ async fn end_poll_command(
             )
             .await?;
 
-            crate::utils::poll_logic::close_and_finalize_poll(
+            super::internal::logic::close_and_finalize_poll(
                 ctx.http(),
                 &ctx.data().db,
                 &ctx.data().cache,
