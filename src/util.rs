@@ -10,3 +10,8 @@ pub fn validate_token(token: Option<&str>) -> anyhow::Result<&str> {
         Err(_) => Err(anyhow!("an invalid token was provided")),
     }
 }
+
+#[must_use]
+pub fn sanitise_pings(message: &str) -> String {
+    message.replace('@', "@\u{200B}")
+}

@@ -71,7 +71,8 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
                 Box::pin(async move {
                     event_handler(ctx, event, framework, data).await?;
                     features::polls::event_handler(ctx, event, framework, data).await?;
-                    features::awty::handle_persistent_buttons(ctx, event).await
+                    features::awty::handle_persistent_buttons(ctx, event).await?;
+                    features::fun::event_handler(ctx, event, framework, data).await
                 })
             },
             ..Default::default()
