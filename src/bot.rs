@@ -51,7 +51,7 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
         let mut cmds = vec![
             info(),
             commands::minecraft::server_status(),
-            commands::awty::are_we_there_yet(),
+            features::awty::are_we_there_yet(),
         ];
         cmds.extend(commands::settings::settings_commands());
         cmds.extend(features::polls::commands());
@@ -65,7 +65,7 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
                 Box::pin(async move {
                     event_handler(ctx, event, framework, data).await?;
                     crate::events::component::handle(ctx, event, framework, data).await?;
-                    crate::awty::event::handle_persistent_buttons(ctx, event).await
+                    features::awty::handle_persistent_buttons(ctx, event).await
                 })
             },
             ..Default::default()

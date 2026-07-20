@@ -1,11 +1,9 @@
-use poise::serenity_prelude::{CreateActionRow, CreateButton, ButtonStyle};
+use poise::serenity_prelude::{ButtonStyle, CreateActionRow, CreateButton};
 use reqwest::Client;
 use url::Url;
 
-use crate::{
-    awty,
-    bot::{Context, Error},
-};
+use super::internal as awty;
+use crate::bot::{Context, Error};
 
 #[poise::command(slash_command, rename = "are-we-there-yet")]
 /// a command to get update status for a packwiz modpack (MODRINTH ONLY!)
@@ -39,8 +37,9 @@ pub async fn are_we_there_yet(
     ctx.send(
         poise::CreateReply::default()
             .embed(embed)
-            .components(components)
-    ).await?;
+            .components(components),
+    )
+    .await?;
 
     Ok(())
 }
