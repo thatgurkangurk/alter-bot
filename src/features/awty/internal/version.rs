@@ -10,7 +10,7 @@ pub async fn are_on_version(
 ) -> Result<HashMap<String, bool>> {
     let mut results: HashMap<String, bool> = HashMap::new();
 
-    let id_slices: Vec<&str> = mods.iter().map(|s| s.as_str()).collect();
+    let id_slices: Vec<&str> = mods.iter().map(std::string::String::as_str).collect();
 
     let projects = ferinth.project_get_multiple(&id_slices).await?;
 

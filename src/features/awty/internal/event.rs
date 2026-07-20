@@ -9,9 +9,9 @@ pub async fn handle_persistent_buttons(
     ctx: &serenity::Context,
     event: &serenity::FullEvent,
 ) -> Result<(), Error> {
-    if let serenity::FullEvent::InteractionCreate { interaction } = event {
-        if let Some(press) = interaction.as_message_component() {
-            if press.data.custom_id.starts_with("rf_awty|") {
+    if let serenity::FullEvent::InteractionCreate { interaction } = event
+        && let Some(press) = interaction.as_message_component()
+            && press.data.custom_id.starts_with("rf_awty|") {
                 let parts: Vec<&str> = press.data.custom_id.split('|').collect();
                 if parts.len() < 5 { return Ok(()); }
 
@@ -45,7 +45,5 @@ pub async fn handle_persistent_buttons(
                     }
                 }
             }
-        }
-    }
     Ok(())
 }

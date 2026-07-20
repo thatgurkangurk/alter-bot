@@ -101,7 +101,7 @@ pub async fn server_status(
                     if names.len() > 15 {
                         let remaining = names.len() - 15;
                         names.truncate(15);
-                        names.push(format!("...and {} more", remaining));
+                        names.push(format!("...and {remaining} more"));
                     }
                     names.join(", ")
                 }
@@ -115,12 +115,12 @@ pub async fn server_status(
 
             let colored_motd = mc_to_ansi(&raw_motd);
 
-            let motd_discord_format = format!("```ansi\n{}\n```", colored_motd);
+            let motd_discord_format = format!("```ansi\n{colored_motd}\n```");
 
             let mut embed = serenity::CreateEmbed::new()
-                .title(format!("{}", hostname))
+                .title(hostname.to_string())
                 .color(0x00FF00)
-                .thumbnail(format!("attachment://{}", filename))
+                .thumbnail(format!("attachment://{filename}"))
                 .field(
                     "players",
                     format!("{}/{}", status.online_players, status.max_players),
@@ -159,11 +159,11 @@ pub async fn server_status(
                 serenity::CreateAttachment::bytes(fallback_icon.to_vec(), "unknown_server.png");
 
             let embed = serenity::CreateEmbed::new()
-                .title(format!("{}", hostname))
+                .title(hostname.to_string())
                 .color(0xFF0000)
                 .thumbnail("attachment://unknown_server.png")
                 .field("status", "offline", false)
-                .description(format!("could not connect to the server.\n*error: {}*", e));
+                .description(format!("could not connect to the server.\n*error: {e}*"));
 
             let reply = poise::CreateReply::default()
                 .embed(embed)

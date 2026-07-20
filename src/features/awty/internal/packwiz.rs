@@ -101,7 +101,7 @@ pub async fn check_packwiz_status(
     let mut stream = futures::stream::iter(metafile_urls)
         .map(|u| {
             let client_clone = client.clone();
-            let filename = u.path_segments().and_then(|s| s.last()).unwrap_or("unknown.toml").to_string();
+            let filename = u.path_segments().and_then(|mut s| s.next_back()).unwrap_or("unknown.toml").to_string();
             tokio::spawn(async move {
                 let res = fetch_modrinth_id(&client_clone, u).await;
                 (filename, res)
@@ -111,11 +111,10 @@ pub async fn check_packwiz_status(
 
     let mut modrinth_ids = HashSet::new();
     while let Some(result) = stream.next().await {
-        if let Ok((_, fetch_result)) = result {
-            if let Ok(Some(id)) = fetch_result {
+        if let Ok((_, fetch_result)) = result
+            && let Ok(Some(id)) = fetch_result {
                 modrinth_ids.insert(id);
             }
-        }
     }
 
     let ferinth = super::create_ferinth();
@@ -123,8 +122,8 @@ pub async fn check_packwiz_status(
     let formatted_output = super::format_mod_statuses(&results, add_percentage);
 
     Ok(CreateEmbed::new()
-        .title(format!("update status for {}", version))
-        .description(format!("```text\n{}\n```", formatted_output))
+        .title(format!("update status for {version}"))
+        .description(format!("```text\n{formatted_output}\n```"))
         .colour(Colour::BLURPLE)
         .timestamp(Timestamp::now()))
 }
