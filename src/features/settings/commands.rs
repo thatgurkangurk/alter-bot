@@ -156,6 +156,8 @@ pub fn settings_commands(
 ) -> Vec<poise::Command<Data, Error>> {
     cmds.push(settings());
     cmds.push(set_log_channel());
+    cmds.push(ban_voter());
+    cmds.push(unban_voter());
 
     cmds
 }
