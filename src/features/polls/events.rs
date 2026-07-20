@@ -109,6 +109,7 @@ async fn handle_vote_button(
         .count(&data.db)
         .await?;
 
+    #[allow(clippy::cast_sign_loss)]
     let role_opt = p
         .required_role_id
         .map(|id| serenity::RoleId::new(id as u64));

@@ -39,29 +39,34 @@ fn extract_motd(value: &Value) -> String {
 /// converts minecraft colour codes (§a, &b) into discord compatible ansi codes
 fn mc_to_ansi(input: &str) -> String {
     let mut result = String::new();
-    let mut chars = input.chars().peekable();
+    let mut chars = input.chars();
 
     while let Some(c) = chars.next() {
-        if (c == '§' || c == '&') && chars.peek().is_some() {
-            let next = chars.next().unwrap();
-            let ansi_code = match next {
-                '0' | '7' | '8' => "\u{001b}[0;30m", // grey/black
-                '1' | '9' => "\u{001b}[0;34m",       // blue
-                '2' | 'a' => "\u{001b}[0;32m",       // green
-                '3' | 'b' => "\u{001b}[0;36m",       // cyan
-                '4' | 'c' => "\u{001b}[0;31m",       // red
-                '5' | 'd' => "\u{001b}[0;35m",       // pink
-                '6' | 'e' => "\u{001b}[0;33m",       // yellow
-                'f' => "\u{001b}[0;37m",             // white
-                'l' => "\u{001b}[1m",                // bold
-                'r' => "\u{001b}[0m",                // reset
-                _ => {
-                    result.push(c);
-                    result.push(next);
-                    continue;
-                }
-            };
-            result.push_str(ansi_code);
+        if c == '§' || c == '&' {
+            // take the next character safely
+            if let Some(next) = chars.next() {
+                let ansi_code = match next {
+                    '0' | '7' | '8' => "\u{001b}[0;30m",
+                    '1' | '9' => "\u{001b}[0;34m",
+                    '2' | 'a' => "\u{001b}[0;32m",
+                    '3' | 'b' => "\u{001b}[0;36m",
+                    '4' | 'c' => "\u{001b}[0;31m",
+                    '5' | 'd' => "\u{001b}[0;35m",
+                    '6' | 'e' => "\u{001b}[0;33m",
+                    'f' => "\u{001b}[0;37m",
+                    'l' => "\u{001b}[1m",
+                    'r' => "\u{001b}[0m",
+                    _ => {
+                        result.push(c);
+                        result.push(next);
+                        continue;
+                    }
+                };
+                result.push_str(ansi_code);
+            } else {
+                // the string ended with a trailing § or &
+                result.push(c);
+            }
         } else {
             result.push(c);
         }
@@ -85,11 +90,10 @@ pub async fn server_status(
 
     match get_minecraft_server_status(&hostname, target_port).await {
         Ok(status) => {
-            let (icon_bytes, filename) = if let Some(favicon_data) = status.favicon {
-                (favicon_data, "icon.png")
-            } else {
-                (fallback_icon.to_vec(), "unknown_server.png")
-            };
+            let (icon_bytes, filename) = status.favicon.map_or_else(
+                || (fallback_icon.to_vec(), "unknown_server.png"),
+                |favicon_data| (favicon_data, "icon.png"),
+            );
 
             let discord_attachment = serenity::CreateAttachment::bytes(icon_bytes, filename);
 
@@ -108,17 +112,18 @@ pub async fn server_status(
                 _ => "no players online (or hidden by server)".to_string(),
             };
 
-            let raw_motd = match &status.description {
-                Some(motd_value) => extract_motd(motd_value),
-                None => "no MOTD provided".to_string(),
-            };
+            let raw_motd = status
+                .description
+                .as_ref()
+                .map_or_else(|| "no MOTD provided".to_string(), extract_motd);
 
             let colored_motd = mc_to_ansi(&raw_motd);
 
             let motd_discord_format = format!("```ansi\n{colored_motd}\n```");
 
+            #[allow(clippy::unreadable_literal)]
             let mut embed = serenity::CreateEmbed::new()
-                .title(hostname.to_string())
+                .title(hostname)
                 .color(0x00FF00)
                 .thumbnail(format!("attachment://{filename}"))
                 .field(
@@ -158,8 +163,9 @@ pub async fn server_status(
             let discord_attachment =
                 serenity::CreateAttachment::bytes(fallback_icon.to_vec(), "unknown_server.png");
 
+            #[allow(clippy::unreadable_literal)]
             let embed = serenity::CreateEmbed::new()
-                .title(hostname.to_string())
+                .title(hostname)
                 .color(0xFF0000)
                 .thumbnail("attachment://unknown_server.png")
                 .field("status", "offline", false)
