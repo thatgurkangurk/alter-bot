@@ -1,4 +1,4 @@
-use crate::bot::{Context, Data, Error};
+use crate::bot::{Context, Error};
 use anyhow::Result;
 use craftping::Response;
 use craftping::tokio::ping;
@@ -182,9 +182,7 @@ pub async fn server_status(
     Ok(())
 }
 
-pub fn minecraft_commands(
-    mut cmds: Vec<poise::Command<Data, Error>>,
-) -> Vec<poise::Command<Data, Error>> {
+pub fn minecraft_commands(mut cmds: Vec<crate::bot::Command>) -> Vec<crate::bot::Command> {
     cmds.push(server_status());
 
     cmds

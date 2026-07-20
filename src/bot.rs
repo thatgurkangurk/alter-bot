@@ -16,6 +16,7 @@ pub struct Data {
 }
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
+pub type Command = poise::Command<Data, Error>;
 
 #[poise::command(slash_command)]
 async fn info(ctx: Context<'_>) -> Result<(), Error> {

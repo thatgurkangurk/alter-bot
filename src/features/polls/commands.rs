@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use super::internal::embed::build_poll_embed;
 use super::internal::renderer::generate_results_chart;
-use crate::bot::{Context, Data, Error};
+use crate::bot::{Context, Error};
 use crate::emojis::{HARD_NO, NO, YES};
 use crate::models::{poll, vote};
 
@@ -242,9 +242,7 @@ async fn start_poll(
     Ok(())
 }
 
-pub fn poll_commands(
-    mut cmds: Vec<poise::Command<Data, Error>>,
-) -> Vec<poise::Command<Data, Error>> {
+pub fn poll_commands(mut cmds: Vec<crate::bot::Command>) -> Vec<crate::bot::Command> {
     cmds.push(start_poll());
     cmds.push(end_poll_command());
     cmds.push(check_poll_status());
