@@ -1,4 +1,3 @@
-use crate::emojis::{HARD_NO, NO, YES};
 use chrono::{DateTime, Utc};
 use poise::serenity_prelude as serenity;
 
@@ -17,14 +16,13 @@ pub fn build_poll_embed(
         "### **choices**".to_string(),
     ];
 
-    for label in options {
-        let prefix = match label.to_lowercase().as_str() {
-            "yes" => YES.text,
-            "no" => NO.text,
-            "hardno" | "hard no" => HARD_NO.text,
-            _ => "🔹", // fallback emoji for other options
-        };
-        description_lines.push(format!("{prefix} {label}"));
+    for (index, label) in options.iter().enumerate() {
+        let index_u32 = u32::try_from(index).unwrap_or(0);
+
+        let emoji =
+            char::from_u32(0x1F1E6 + index_u32).map_or_else(|| "🔹".to_string(), |c| c.to_string());
+
+        description_lines.push(format!("{emoji} **{label}**"));
     }
 
     if let Some(role_id) = required_role {

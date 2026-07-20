@@ -45,16 +45,13 @@ pub fn generate_results_chart(options: &[poll_option::Model], votes: &[vote::Mod
 
     let mut lines = Vec::new();
 
-    for (opt, count, score) in &option_results {
-        // fall back to a bullet point emoji for custom options
-        let prefix = match opt.label.to_lowercase().as_str() {
-            "yes" => crate::emojis::YES.text,
-            "no" => crate::emojis::NO.text,
-            "hardno" | "hard no" => crate::emojis::HARD_NO.text,
-            _ => "🔹",
-        };
+    for (index, (opt, count, score)) in option_results.iter().enumerate() {
+        let index_u32 = u32::try_from(index).unwrap_or(0);
 
-        let weight_text = format!(" (weighted {})", f(opt.weight));
+        let prefix =
+            char::from_u32(0x1F1E6 + index_u32).map_or_else(|| "🔹".to_string(), |c| c.to_string());
+
+        let weight_text = format!(" (weighted {:.2})", opt.weight);
 
         lines.push(format!(
             "{} {} | {} votes{}",

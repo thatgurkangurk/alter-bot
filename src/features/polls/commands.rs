@@ -118,15 +118,13 @@ async fn check_poll_status(
         "### **voter breakdown**".to_string(),
     ];
 
-    for opt in &options {
-        let prefix = match opt.label.to_lowercase().as_str() {
-            "yes" => crate::emojis::YES.text.to_string(),
-            "no" => crate::emojis::NO.text.to_string(),
-            "hardno" | "hard no" => crate::emojis::HARD_NO.text.to_string(),
-            _ => "🔹".to_string(),
-        };
+    for (index, opt) in options.iter().enumerate() {
+        let index_u32 = u32::try_from(index).unwrap_or(0);
 
-        description_lines.push(format!("{prefix} **{}**", opt.label));
+        let emoji =
+            char::from_u32(0x1F1E6 + index_u32).map_or_else(|| "🔹".to_string(), |c| c.to_string());
+
+        description_lines.push(format!("{emoji} **{}**", opt.label));
 
         let user_ids = grouped_votes
             .get(&opt.id)
@@ -190,7 +188,7 @@ async fn start_poll(
     let mut buttons = Vec::new();
     let mut labels = Vec::new();
 
-    for raw in raw_inputs.into_iter().flatten() {
+    for (index, raw) in raw_inputs.into_iter().flatten().enumerate() {
         if raw.trim().is_empty() {
             continue;
         }
@@ -199,6 +197,9 @@ async fn start_poll(
         let label = parts[0].trim().to_string();
         let weight_opt = parts.get(1).map(|s| s.trim().to_string());
         let weight = parse_weight(weight_opt);
+
+        let index_u32 = u32::try_from(index).unwrap_or(0);
+        let emoji = char::from_u32(0x1F1E6 + index_u32);
 
         let opt_id = Uuid::new_v4();
         poll_opts.push(poll_option::ActiveModel {
@@ -209,11 +210,16 @@ async fn start_poll(
         });
 
         labels.push(label.clone());
-        buttons.push(
-            serenity::CreateButton::new(format!("vote_{opt_id}_{poll_id}"))
-                .label(label)
-                .style(serenity::ButtonStyle::Secondary),
-        );
+
+        let mut button = serenity::CreateButton::new(format!("vote_{opt_id}_{poll_id}"))
+            .label(label)
+            .style(serenity::ButtonStyle::Secondary);
+
+        if let Some(e) = emoji {
+            button = button.emoji(e);
+        }
+
+        buttons.push(button);
     }
 
     let new_poll = poll::ActiveModel {
@@ -253,12 +259,7 @@ async fn start_poll(
     poll_am.update(&ctx.data().db).await?;
     ctx.data().cache.write().await.insert(poll_id, ends_at);
 
-    ctx.send(
-        poise::CreateReply::default()
-            .content("poll created!")
-            .ephemeral(true),
-    )
-    .await?;
+    ctx.say("poll created !").await?;
     Ok(())
 }
 

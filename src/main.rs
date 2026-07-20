@@ -9,7 +9,6 @@ mod bot;
 mod config;
 mod consts;
 mod db;
-mod emojis;
 mod features;
 mod models;
 mod util;

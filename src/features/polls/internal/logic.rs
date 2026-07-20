@@ -36,14 +36,13 @@ pub async fn close_and_finalize_poll(
         "### **choices**".to_string(),
     ];
 
-    for opt in &options {
-        let prefix = match opt.label.to_lowercase().as_str() {
-            "yes" => crate::emojis::YES.text,
-            "no" => crate::emojis::NO.text,
-            "hardno" | "hard no" => crate::emojis::HARD_NO.text,
-            _ => "🔹", // fallback for custom options
-        };
-        description_lines.push(format!("{prefix} {}", opt.label));
+    for (index, opt) in options.iter().enumerate() {
+        let index_u32 = u32::try_from(index).unwrap_or(0);
+
+        let emoji =
+            char::from_u32(0x1F1E6 + index_u32).map_or_else(|| "🔹".to_string(), |c| c.to_string());
+
+        description_lines.push(format!("{emoji} {}", opt.label));
     }
 
     if let Some(role_id) = poll_model.required_role_id {
