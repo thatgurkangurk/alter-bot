@@ -45,18 +45,22 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
 
     let db = create_db(config).await?;
 
+    // this is a block to prevent someone (me) being stupid and modifying the vec outside this scope
+    let commands = {
+        // if a module has 2 or more commands, use cmds.extend instead
+        let mut cmds = vec![
+            info(),
+            commands::minecraft::server_status(),
+            commands::awty::are_we_there_yet(),
+        ];
+        cmds.extend(commands::settings::settings_commands());
+        cmds.extend(commands::polls::poll_commands());
+        cmds
+    };
+
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![
-                info(),
-                commands::polls::start_poll(),
-                commands::polls::end_poll_command(),
-                commands::polls::check_poll_status(),
-                commands::settings::settings(),
-                commands::settings::set_log_channel(),
-                commands::minecraft::server_status(),
-                commands::awty::are_we_there_yet(),
-            ],
+            commands,
             event_handler: |ctx, event, framework, data| {
                 Box::pin(async move {
                     event_handler(ctx, event, framework, data).await?;
