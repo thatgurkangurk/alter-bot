@@ -1,13 +1,13 @@
 use ::serenity::Client;
 use chrono::{DateTime, Utc};
-use poise::serenity_prelude as serenity;
+use poise::{CreateReply, serenity_prelude as serenity};
 use sea_orm::DatabaseConnection;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{config::Config, db::create_db, features};
+use crate::{config::Config, consts, db::create_db, features};
 
 pub type PollCache = Arc<RwLock<HashMap<Uuid, DateTime<Utc>>>>;
 pub struct Data {
@@ -19,7 +19,19 @@ pub type Context<'a> = poise::Context<'a, Data, Error>;
 
 #[poise::command(slash_command)]
 async fn info(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("i am alter bot").await?;
+    let bot_user = ctx.cache().current_user().clone();
+
+    let embed = serenity::CreateEmbed::new()
+        .title("alter bot")
+        .field("version", consts::VERSION, true)
+        .field("authors", consts::AUTHORS_RAW.replace(':', ", "), true)
+        .field("repository", consts::REPOSITORY, false)
+        .colour(serenity::Colour::from_rgb(236, 253, 245))
+        .timestamp(serenity::Timestamp::now())
+        .thumbnail(bot_user.face());
+
+    ctx.send(CreateReply::default().embed(embed)).await?;
+
     Ok(())
 }
 
