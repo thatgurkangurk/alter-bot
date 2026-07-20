@@ -1,6 +1,6 @@
+use super::renderer::generate_results_chart;
 use crate::bot::Error;
 use crate::models::{guild, poll, vote};
-use crate::utils::renderer::generate_results_chart;
 use poise::serenity_prelude as serenity;
 use sea_orm::{ActiveModelTrait, QueryFilter, Set, entity::prelude::*};
 use std::fmt::Write;

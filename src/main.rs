@@ -5,39 +5,24 @@ use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 use crate::{bot::create_bot, config::Config};
 
-mod awty;
 mod bot;
-mod commands;
 mod config;
 mod consts;
 mod db;
 mod emojis;
-mod events;
+mod features;
 mod models;
-mod tasks;
 mod util;
-mod utils;
 
 fn print_startup_info() {
+    info!("==========================================");
     info!("alter-bot version {} by gurkan", consts::VERSION);
     info!("MPL 2.0 license");
     info!("{}", &consts::REPOSITORY);
+    info!("==========================================");
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,alter_bot=info"));
-
-    let timer = fmt::time::ChronoLocal::new("%Y-%m-%d %H:%M:%S".to_string());
-
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt::layer().compact().with_target(true).with_timer(timer))
-        .init();
-
-    print_startup_info();
-
+fn load_config() -> anyhow::Result<Config> {
     let default_path = Path::new(consts::DATA_DIR).join("alter-bot.toml");
 
     if !default_path.exists() {
@@ -57,7 +42,24 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let config = Config::load(Some(&default_path))?;
+    Config::load(Some(&default_path))
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,alter_bot=info"));
+
+    let timer = fmt::time::ChronoLocal::new("%Y-%m-%d %H:%M:%S".to_string());
+
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt::layer().compact().with_target(true).with_timer(timer))
+        .init();
+
+    print_startup_info();
+
+    let config = load_config()?;
 
     let mut bot = create_bot(&config).await?;
 

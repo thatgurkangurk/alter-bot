@@ -2,7 +2,7 @@ use poise::serenity_prelude as serenity;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{Set, entity::prelude::*};
 
-use crate::bot::{Context, Error};
+use crate::bot::{Context, Data, Error};
 use crate::models::{guild, voter_ban};
 
 /// configure server-specific bot settings
@@ -13,13 +13,13 @@ use crate::models::{guild, voter_ban};
     subcommands("set_log_channel", "ban_voter", "unban_voter")
 )]
 #[allow(clippy::unused_async)]
-pub async fn settings(_: Context<'_>) -> Result<(), Error> {
+async fn settings(_: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
 /// set the admin channel where finished poll results are logged
 #[poise::command(slash_command, guild_only)]
-pub async fn set_log_channel(
+async fn set_log_channel(
     ctx: Context<'_>,
     #[description = "the channel to send poll results to"] channel: serenity::GuildChannel,
 ) -> Result<(), Error> {
@@ -58,7 +58,7 @@ pub async fn set_log_channel(
 
 /// prevent a specific user from voting in this server
 #[poise::command(slash_command, guild_only)]
-pub async fn ban_voter(
+async fn ban_voter(
     ctx: Context<'_>,
     #[description = "user to ban from voting"] user: serenity::User,
 ) -> Result<(), Error> {
@@ -99,7 +99,7 @@ pub async fn ban_voter(
 
 /// Allow a previously banned user to vote again
 #[poise::command(slash_command, guild_only)]
-pub async fn unban_voter(
+async fn unban_voter(
     ctx: Context<'_>,
     #[description = "user to unban"] user: serenity::User,
 ) -> Result<(), Error> {
@@ -149,4 +149,15 @@ async fn ensure_guild_exists(db: &sea_orm::DatabaseConnection, guild_id: i64) ->
         .await?;
 
     Ok(())
+}
+
+pub fn settings_commands(
+    mut cmds: Vec<poise::Command<Data, Error>>,
+) -> Vec<poise::Command<Data, Error>> {
+    cmds.push(settings());
+    cmds.push(set_log_channel());
+    cmds.push(ban_voter());
+    cmds.push(unban_voter());
+
+    cmds
 }

@@ -44,13 +44,9 @@ pub async fn run_fast_loop(
                 .await;
 
             if let Ok(Some(active_poll)) = poll_opt {
-                if let Err(e) = crate::utils::poll_logic::close_and_finalize_poll(
-                    &http,
-                    &db,
-                    &cache,
-                    active_poll,
-                )
-                .await
+                if let Err(e) =
+                    super::internal::logic::close_and_finalize_poll(&http, &db, &cache, active_poll)
+                        .await
                 {
                     eprintln!("Error finalising poll {poll_id}: {e}");
                 }

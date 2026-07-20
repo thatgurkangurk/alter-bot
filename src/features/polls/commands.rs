@@ -4,18 +4,18 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use std::fmt::Write;
 use uuid::Uuid;
 
-use crate::bot::{Context, Error};
+use super::internal::embed::build_poll_embed;
+use super::internal::renderer::generate_results_chart;
+use crate::bot::{Context, Data, Error};
 use crate::emojis::{HARD_NO, NO, YES};
 use crate::models::{poll, vote};
-use crate::utils::embeds::build_poll_embed;
-use crate::utils::renderer::generate_results_chart;
 
 #[poise::command(
     context_menu_command = "End Poll",
     required_permissions = "ADMINISTRATOR",
     guild_only
 )]
-pub async fn end_poll_command(
+async fn end_poll_command(
     ctx: crate::bot::Context<'_>,
     #[description = "The poll message to end"] message: serenity::Message,
 ) -> Result<(), Error> {
@@ -36,7 +36,7 @@ pub async fn end_poll_command(
             )
             .await?;
 
-            crate::utils::poll_logic::close_and_finalize_poll(
+            super::internal::logic::close_and_finalize_poll(
                 ctx.http(),
                 &ctx.data().db,
                 &ctx.data().cache,
@@ -63,7 +63,7 @@ pub async fn end_poll_command(
     required_permissions = "ADMINISTRATOR",
     guild_only
 )]
-pub async fn check_poll_status(
+async fn check_poll_status(
     ctx: Context<'_>,
     #[description = "The poll message to check"] message: serenity::Message,
 ) -> Result<(), Error> {
@@ -165,7 +165,7 @@ pub async fn check_poll_status(
 
 /// start a new poll
 #[poise::command(slash_command, required_permissions = "ADMINISTRATOR", guild_only)]
-pub async fn start_poll(
+async fn start_poll(
     ctx: Context<'_>,
     #[description = "poll title"] poll_title: String,
     #[description = "channel to post the poll in"] target_channel: serenity::GuildChannel,
@@ -240,4 +240,14 @@ pub async fn start_poll(
     .await?;
 
     Ok(())
+}
+
+pub fn poll_commands(
+    mut cmds: Vec<poise::Command<Data, Error>>,
+) -> Vec<poise::Command<Data, Error>> {
+    cmds.push(start_poll());
+    cmds.push(end_poll_command());
+    cmds.push(check_poll_status());
+
+    cmds
 }

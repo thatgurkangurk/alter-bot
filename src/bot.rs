@@ -1,13 +1,13 @@
 use ::serenity::Client;
 use chrono::{DateTime, Utc};
-use poise::serenity_prelude as serenity;
+use poise::{CreateReply, serenity_prelude as serenity};
 use sea_orm::DatabaseConnection;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{commands, config::Config, db::create_db};
+use crate::{config::Config, consts, db::create_db, features};
 
 pub type PollCache = Arc<RwLock<HashMap<Uuid, DateTime<Utc>>>>;
 pub struct Data {
@@ -19,7 +19,19 @@ pub type Context<'a> = poise::Context<'a, Data, Error>;
 
 #[poise::command(slash_command)]
 async fn info(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("i am alter bot").await?;
+    let bot_user = ctx.cache().current_user().clone();
+
+    let embed = serenity::CreateEmbed::new()
+        .title("alter bot")
+        .field("version", consts::VERSION, true)
+        .field("authors", consts::AUTHORS_RAW.replace(':', ", "), true)
+        .field("repository", consts::REPOSITORY, false)
+        .colour(serenity::Colour::from_rgb(236, 253, 245))
+        .timestamp(serenity::Timestamp::now())
+        .thumbnail(bot_user.face());
+
+    ctx.send(CreateReply::default().embed(embed)).await?;
+
     Ok(())
 }
 
@@ -45,23 +57,20 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
 
     let db = create_db(config).await?;
 
+    let commands = vec![info(), features::awty::are_we_there_yet()];
+
+    let commands = features::polls::commands(commands);
+    let commands = features::settings::commands(commands);
+    let commands = features::minecraft::commands(commands);
+
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![
-                info(),
-                commands::polls::start_poll(),
-                commands::polls::end_poll_command(),
-                commands::polls::check_poll_status(),
-                commands::settings::settings(),
-                commands::settings::set_log_channel(),
-                commands::minecraft::server_status(),
-                commands::awty::are_we_there_yet(),
-            ],
+            commands,
             event_handler: |ctx, event, framework, data| {
                 Box::pin(async move {
                     event_handler(ctx, event, framework, data).await?;
-                    crate::events::component::handle(ctx, event, framework, data).await?;
-                    crate::awty::event::handle_persistent_buttons(ctx, event).await
+                    features::polls::event_handler(ctx, event, framework, data).await?;
+                    features::awty::handle_persistent_buttons(ctx, event).await
                 })
             },
             ..Default::default()
@@ -79,16 +88,12 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 
                 tokio::spawn(async move {
-                    crate::tasks::poll_expiry::run_fast_loop(
-                        http_clone,
-                        db_clone_fast,
-                        cache_clone_fast,
-                    )
-                    .await;
+                    features::polls::run_fast_loop(http_clone, db_clone_fast, cache_clone_fast)
+                        .await;
                 });
 
                 tokio::spawn(async move {
-                    crate::tasks::poll_expiry::run_sync_loop(db_clone_sync, cache_clone_sync).await;
+                    features::polls::run_sync_loop(db_clone_sync, cache_clone_sync).await;
                 });
 
                 Ok(Data { db, cache })
