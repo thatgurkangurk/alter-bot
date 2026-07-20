@@ -18,7 +18,7 @@ pub async fn settings(_: Context<'_>) -> Result<(), Error> {
 }
 
 /// set the admin channel where finished poll results are logged
-#[poise::command(slash_command)]
+#[poise::command(slash_command, guild_only)]
 pub async fn set_log_channel(
     ctx: Context<'_>,
     #[description = "the channel to send poll results to"] channel: serenity::GuildChannel,
@@ -57,7 +57,7 @@ pub async fn set_log_channel(
 }
 
 /// prevent a specific user from voting in this server
-#[poise::command(slash_command)]
+#[poise::command(slash_command, guild_only)]
 pub async fn ban_voter(
     ctx: Context<'_>,
     #[description = "user to ban from voting"] user: serenity::User,
@@ -98,7 +98,7 @@ pub async fn ban_voter(
 }
 
 /// Allow a previously banned user to vote again
-#[poise::command(slash_command)]
+#[poise::command(slash_command, guild_only)]
 pub async fn unban_voter(
     ctx: Context<'_>,
     #[description = "user to unban"] user: serenity::User,
