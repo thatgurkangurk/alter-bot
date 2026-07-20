@@ -6,22 +6,25 @@ pub fn build_poll_embed(
     title: &str,
     ends_at: DateTime<Utc>,
     total_votes: u64,
-    include_hard_no: bool,
+    options: &[String],
     required_role: Option<serenity::RoleId>,
 ) -> serenity::CreateEmbed {
     let timestamp = format!("<t:{}:R>", ends_at.timestamp());
 
-    // Assemble the body line-by-line dynamically
     let mut description_lines = vec![
         format!("### {title}"),
         String::new(),
         "### **choices**".to_string(),
-        format!("{} yes", YES.text),
-        format!("{} no", NO.text),
     ];
 
-    if include_hard_no {
-        description_lines.push(format!("{} hard no", HARD_NO.text));
+    for label in options {
+        let prefix = match label.to_lowercase().as_str() {
+            "yes" => YES.text,
+            "no" => NO.text,
+            "hardno" | "hard no" => HARD_NO.text,
+            _ => "🔹", // fallback emoji for other options
+        };
+        description_lines.push(format!("{prefix} {label}"));
     }
 
     if let Some(role_id) = required_role {

@@ -1,4 +1,3 @@
-use chrono::Utc;
 use poise::serenity_prelude as serenity;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{Set, entity::prelude::*};
@@ -6,7 +5,7 @@ use uuid::Uuid;
 
 use super::internal::embed::build_poll_embed;
 use crate::bot::{Data, Error};
-use crate::models::{poll, vote, voter_ban};
+use crate::models::{poll, poll_option, vote, voter_ban};
 
 pub async fn event_handler(
     ctx: &serenity::Context,
@@ -38,7 +37,10 @@ async fn handle_vote_button(
         return Ok(());
     }
 
-    let choice_str = parts[1];
+    // parts[1] is now the option uuid instead of a hardcoded string
+    let Ok(option_id) = Uuid::parse_str(parts[1]) else {
+        return Ok(());
+    };
     let Ok(poll_id) = Uuid::parse_str(parts[2]) else {
         return Ok(());
     };
@@ -82,23 +84,26 @@ async fn handle_vote_button(
         .await;
     }
 
-    let choice = match choice_str {
-        "Yes" => vote::VoteChoice::Yes,
-        "No" => vote::VoteChoice::No,
-        "HardNo" => vote::VoteChoice::HardNo,
-        _ => return Ok(()),
+    // fetch the selected option to get its label for the confirmation message
+    let selected_option = poll_option::Entity::find_by_id(option_id)
+        .one(&data.db)
+        .await?;
+
+    let Some(option) = selected_option else {
+        return reply_ephemeral(ctx, component, "that option wasn't found").await;
     };
 
     let new_vote = vote::ActiveModel {
         poll_id: Set(poll_id),
         user_id: Set(user_id),
-        choice: Set(choice),
+        option_id: Set(option_id),
     };
 
+    // upsert the vote. if they already voted, update the option_id.
     vote::Entity::insert(new_vote)
         .on_conflict(
             OnConflict::columns([vote::Column::PollId, vote::Column::UserId])
-                .update_column(vote::Column::Choice)
+                .update_column(vote::Column::OptionId)
                 .to_owned(),
         )
         .exec(&data.db)
@@ -109,14 +114,22 @@ async fn handle_vote_button(
         .count(&data.db)
         .await?;
 
+    let db_options = poll_option::Entity::find()
+        .filter(poll_option::Column::PollId.eq(poll_id))
+        .all(&data.db)
+        .await?;
+
+    let option_labels: Vec<String> = db_options.into_iter().map(|o| o.label).collect();
+
     #[allow(clippy::cast_sign_loss)]
     let role_opt = p
         .required_role_id
         .map(|id| serenity::RoleId::new(id as u64));
 
-    let ends_at_utc = p.ends_at.with_timezone(&Utc);
+    let ends_at_utc = p.ends_at.with_timezone(&chrono::Utc);
+
     let updated_embed =
-        build_poll_embed(&p.title, ends_at_utc, total_votes, p.has_hard_no, role_opt);
+        build_poll_embed(&p.title, ends_at_utc, total_votes, &option_labels, role_opt);
 
     let response = serenity::CreateInteractionResponseMessage::new().embed(updated_embed);
     component
@@ -131,7 +144,8 @@ async fn handle_vote_button(
             &ctx.http,
             serenity::CreateInteractionResponseFollowup::new()
                 .content(format!(
-                    "your vote for **{choice_str}** has been recorded !"
+                    "your vote for **{}** has been recorded !",
+                    option.label
                 ))
                 .ephemeral(true),
         )

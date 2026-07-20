@@ -1,31 +1,32 @@
-use crate::emojis::{HARD_NO, NO, YES};
-use crate::models::vote::VoteChoice;
+use crate::models::{poll_option, vote};
+use std::collections::HashMap;
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-pub fn generate_results_chart(votes: &[(i64, VoteChoice)], has_hard_no: bool) -> String {
-    let mut yes_count = 0;
-    let mut no_count = 0;
-    let mut hard_no_count = 0;
-
-    for (_, choice) in votes {
-        match choice {
-            VoteChoice::Yes => yes_count += 1,
-            VoteChoice::No => no_count += 1,
-            VoteChoice::HardNo => hard_no_count += 1,
-        }
+pub fn generate_results_chart(options: &[poll_option::Model], votes: &[vote::Model]) -> String {
+    let mut vote_counts: HashMap<uuid::Uuid, usize> = HashMap::new();
+    for v in votes {
+        *vote_counts.entry(v.option_id).or_insert(0) += 1;
     }
 
-    let total_yes_score: f64 = f64::from(yes_count);
-    let total_no_score: f64 = f64::from(hard_no_count).mul_add(1.5, f64::from(no_count));
-    let total_votes = yes_count + no_count + hard_no_count;
+    let total_votes = votes.len();
 
-    let yes_score = total_yes_score;
-    let no_score = f64::from(no_count);
-    let hard_no_score = f64::from(hard_no_count) * 1.5;
+    let mut option_results: Vec<(&poll_option::Model, usize, f64)> = Vec::new();
+    let mut max_score = 1.0_f64; // to avoid divide-by-zero
 
-    let max_score = yes_score.max(no_score).max(hard_no_score).max(1.0_f64);
+    for opt in options {
+        let raw_count = *vote_counts.get(&opt.id).unwrap_or(&0);
+        let score = f64::from(raw_count as u32) * opt.weight;
+
+        if score > max_score {
+            max_score = score;
+        }
+
+        option_results.push((opt, raw_count, score));
+    }
+
+    option_results.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+
     let max_bar_len: f64 = 10.0;
-
     let make_bar = |score: f64| -> String {
         let filled_blocks = if max_score > 0.0 {
             ((score / max_score) * max_bar_len).round() as usize
@@ -42,35 +43,45 @@ pub fn generate_results_chart(votes: &[(i64, VoteChoice)], has_hard_no: bool) ->
 
     let f = |n: f64| format!("{n:.1}").replace('.', ",");
 
-    let outcome_text = if total_yes_score > total_no_score {
-        format!(
-            "**passed** (yes {} vs no {})",
-            f(total_yes_score),
-            f(total_no_score)
-        )
-    } else if total_no_score > total_yes_score {
-        format!(
-            "**failed** (yes {} vs no {})",
-            f(total_yes_score),
-            f(total_no_score)
-        )
-    } else {
-        format!("**tie** (score: {})", f(total_yes_score))
-    };
+    let mut lines = Vec::new();
 
-    let mut lines = vec![
-        format!("{} {} | {} votes", YES.text, make_bar(yes_score), yes_count),
-        format!("{} {} | {} votes", NO.text, make_bar(no_score), no_count),
-    ];
+    for (opt, count, score) in &option_results {
+        // fall back to a bullet point emoji for custom options
+        let prefix = match opt.label.to_lowercase().as_str() {
+            "yes" => crate::emojis::YES.text,
+            "no" => crate::emojis::NO.text,
+            "hardno" | "hard no" => crate::emojis::HARD_NO.text,
+            _ => "🔹",
+        };
 
-    if has_hard_no {
+        let weight_text = if (opt.weight - 1.0).abs() > f64::EPSILON {
+            format!(" (weighted {})", f(opt.weight))
+        } else {
+            String::new()
+        };
+
         lines.push(format!(
-            "{} {} | {} votes (weighted 1,5)",
-            HARD_NO.text,
-            make_bar(hard_no_score),
-            hard_no_count
+            "{} {} | {} votes{}",
+            prefix,
+            make_bar(*score),
+            count,
+            weight_text
         ));
     }
+
+    let outcome_text = if option_results.is_empty() {
+        "**no options configured**".to_string()
+    } else if option_results.len() > 1
+        && (option_results[0].2 - option_results[1].2).abs() < f64::EPSILON
+    {
+        format!("**tie** (highest score: {})", f(option_results[0].2))
+    } else {
+        format!(
+            "**winner:** {} (score: {})",
+            option_results[0].0.label,
+            f(option_results[0].2)
+        )
+    };
 
     lines.push(String::new());
     lines.push("**outcome:**".to_string());

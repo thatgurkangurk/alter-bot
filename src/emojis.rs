@@ -3,6 +3,7 @@
 use poise::serenity_prelude as serenity;
 
 pub struct BotEmoji {
+    #[allow(dead_code)]
     pub id: serenity::EmojiId,
     pub text: &'static str,
 }

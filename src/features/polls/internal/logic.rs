@@ -1,8 +1,9 @@
 use super::renderer::generate_results_chart;
 use crate::bot::Error;
-use crate::models::{guild, poll, vote};
+use crate::models::{guild, poll, poll_option, vote};
 use poise::serenity_prelude as serenity;
 use sea_orm::{ActiveModelTrait, QueryFilter, Set, entity::prelude::*};
+use std::collections::HashMap;
 use std::fmt::Write;
 
 pub async fn close_and_finalize_poll(
@@ -17,26 +18,32 @@ pub async fn close_and_finalize_poll(
 
     cache.write().await.remove(&poll_model.id);
 
+    let options = poll_option::Entity::find()
+        .filter(poll_option::Column::PollId.eq(poll_model.id))
+        .all(db)
+        .await?;
+
     let votes = vote::Entity::find()
         .filter(vote::Column::PollId.eq(poll_model.id))
         .all(db)
         .await?;
 
-    let vote_data: Vec<(i64, vote::VoteChoice)> =
-        votes.into_iter().map(|v| (v.user_id, v.choice)).collect();
-
-    let chart = generate_results_chart(&vote_data, poll_model.has_hard_no);
+    let chart = generate_results_chart(&options, &votes);
 
     let mut description_lines = vec![
         format!("### {}", poll_model.title),
         String::new(), // blank line
         "### **choices**".to_string(),
-        crate::emojis::YES.text.to_string(),
-        crate::emojis::NO.text.to_string(),
     ];
 
-    if poll_model.has_hard_no {
-        description_lines.push(crate::emojis::HARD_NO.text.to_string());
+    for opt in &options {
+        let prefix = match opt.label.to_lowercase().as_str() {
+            "yes" => crate::emojis::YES.text,
+            "no" => crate::emojis::NO.text,
+            "hardno" | "hard no" => crate::emojis::HARD_NO.text,
+            _ => "🔹", // fallback for custom options
+        };
+        description_lines.push(format!("{prefix} {}", opt.label));
     }
 
     if let Some(role_id) = poll_model.required_role_id {
@@ -61,28 +68,28 @@ pub async fn close_and_finalize_poll(
 
         let builder = serenity::EditMessage::new()
             .embed(results_embed)
-            .components(vec![]);
+            .components(vec![]); // removes the buttons since the poll is closed
 
         let _ = channel_id.edit_message(&http, message_id, builder).await;
     }
 
-    // admin logging
     if let Ok(Some(guild_config)) = guild::Entity::find_by_id(poll_model.guild_id).one(db).await
         && let Some(log_channel_id) = guild_config.log_channel_id
     {
         let log_channel = serenity::ChannelId::new(log_channel_id.cast_unsigned());
         let guild_id = serenity::GuildId::new(poll_model.guild_id.cast_unsigned());
 
-        let mut yes_votes = Vec::new();
-        let mut no_votes = Vec::new();
-        let mut hard_no_votes = Vec::new();
+        // group votes by option_id
+        let mut grouped_votes: HashMap<uuid::Uuid, Vec<i64>> = HashMap::new();
+        for opt in &options {
+            grouped_votes.insert(opt.id, Vec::new()); // ensure every option exists in the map
+        }
 
-        for (user_id, choice) in vote_data {
-            match choice {
-                vote::VoteChoice::Yes => yes_votes.push(user_id),
-                vote::VoteChoice::No => no_votes.push(user_id),
-                vote::VoteChoice::HardNo => hard_no_votes.push(user_id),
-            }
+        for v in &votes {
+            grouped_votes
+                .entry(v.option_id)
+                .or_default()
+                .push(v.user_id);
         }
 
         let mut log_content = format!(
@@ -90,20 +97,19 @@ pub async fn close_and_finalize_poll(
             poll_model.title
         );
 
-        let categories = [
-            ("yes", yes_votes),
-            ("no", no_votes),
-            ("hard no", hard_no_votes),
-        ];
-
-        for (i, (label, votes)) in categories.iter().enumerate() {
-            let _ = writeln!(log_content, "{label}");
+        // iterate over the dynamic options to build the log output
+        for (i, opt) in options.iter().enumerate() {
+            let _ = writeln!(log_content, "{}", opt.label);
             let _ = writeln!(log_content, "----");
 
-            if votes.is_empty() {
+            let user_ids = grouped_votes
+                .get(&opt.id)
+                .ok_or_else(|| anyhow::anyhow!("failed to find votes for option: {}", opt.id))?;
+
+            if user_ids.is_empty() {
                 let _ = writeln!(log_content, "no one voted for this");
             } else {
-                for &id in votes {
+                for &id in user_ids {
                     let user_id = serenity::UserId::new(id.cast_unsigned());
 
                     // fetch the member object from Discord to get their server nickname
@@ -116,7 +122,7 @@ pub async fn close_and_finalize_poll(
                 }
             }
 
-            if i < categories.len() - 1 {
+            if i < options.len() - 1 {
                 let _ = writeln!(log_content);
             }
         }

@@ -8,13 +8,10 @@ pub struct Model {
     pub id: Uuid,
     pub guild_id: i64,
     pub channel_id: i64,
-    pub message_id: Option<i64>, // populated after the Discord message is sent
+    pub message_id: Option<i64>,
     pub title: String,
-    pub ends_at: DateTimeWithTimeZone, // maps to postgres TIMESTAMPTZ
+    pub ends_at: DateTimeWithTimeZone,
     pub is_active: bool,
-    #[sea_orm(default_value = true)] // for existing ones that don't have it explicitly set
-    pub has_hard_no: bool,
-
     pub required_role_id: Option<i64>,
 }
 
@@ -28,6 +25,8 @@ pub enum Relation {
     Guild,
     #[sea_orm(has_many = "super::vote::Entity")]
     Vote,
+    #[sea_orm(has_many = "super::poll_option::Entity")]
+    PollOption,
 }
 
 impl Related<super::guild::Entity> for Entity {
@@ -39,6 +38,12 @@ impl Related<super::guild::Entity> for Entity {
 impl Related<super::vote::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Vote.def()
+    }
+}
+
+impl Related<super::poll_option::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::PollOption.def()
     }
 }
 
