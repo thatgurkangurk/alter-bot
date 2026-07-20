@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{commands, config::Config, db::create_db};
+use crate::{commands, config::Config, db::create_db, features};
 
 pub type PollCache = Arc<RwLock<HashMap<Uuid, DateTime<Utc>>>>;
 pub struct Data {
@@ -54,7 +54,7 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
             commands::awty::are_we_there_yet(),
         ];
         cmds.extend(commands::settings::settings_commands());
-        cmds.extend(commands::polls::poll_commands());
+        cmds.extend(features::polls::commands());
         cmds
     };
 
@@ -83,16 +83,12 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 
                 tokio::spawn(async move {
-                    crate::tasks::poll_expiry::run_fast_loop(
-                        http_clone,
-                        db_clone_fast,
-                        cache_clone_fast,
-                    )
-                    .await;
+                    features::polls::run_fast_loop(http_clone, db_clone_fast, cache_clone_fast)
+                        .await;
                 });
 
                 tokio::spawn(async move {
-                    crate::tasks::poll_expiry::run_sync_loop(db_clone_sync, cache_clone_sync).await;
+                    features::polls::run_sync_loop(db_clone_sync, cache_clone_sync).await;
                 });
 
                 Ok(Data { db, cache })

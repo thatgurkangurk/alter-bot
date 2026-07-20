@@ -13,8 +13,8 @@ mod consts;
 mod db;
 mod emojis;
 mod events;
+mod features;
 mod models;
-mod tasks;
 mod util;
 mod utils;
 
