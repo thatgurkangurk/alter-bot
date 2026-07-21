@@ -11,6 +11,7 @@ pub(super) mod polls;
 pub struct StatusResponse {
     pub status: &'static str,
     pub active_shards: usize,
+    pub version: &'static str,
 }
 
 pub async fn status_handler(
@@ -25,12 +26,14 @@ pub async fn status_handler(
         return Ok(Json(StatusResponse {
             status: "disconnected",
             active_shards: 0,
+            version: crate::consts::VERSION,
         }));
     }
 
     Ok(Json(StatusResponse {
         status: "online",
         active_shards,
+        version: crate::consts::VERSION,
     }))
 }
 
