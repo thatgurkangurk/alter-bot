@@ -11,6 +11,8 @@ use crate::bot::Error;
 use crate::features::polls::internal::embed::build_poll_embed;
 use crate::models::{guild, poll, poll_option, vote};
 
+use tracing::{error, info, instrument};
+
 pub struct CreatePollParams {
     pub title: String,
     pub guild_id: serenity::GuildId,
@@ -21,6 +23,16 @@ pub struct CreatePollParams {
 }
 
 /// creates a new poll and sends a message in the discord channel
+#[instrument(
+    skip(db, http, params),
+    fields(
+        poll_id,
+        guild_id = params.guild_id.get(),
+        channel_id = params.target_channel_id.get(),
+        title = %params.title
+    )
+)]
+#[allow(clippy::too_many_lines)]
 pub async fn create_and_post_poll(
     db: &DatabaseConnection,
     http: impl serenity::CacheHttp,
@@ -30,6 +42,8 @@ pub async fn create_and_post_poll(
 
     let ends_at = Utc::now() + Duration::minutes(params.duration_minutes);
     let poll_id = Uuid::new_v4();
+
+    tracing::Span::current().record("poll_id", poll_id.to_string());
 
     let mut poll_opts = Vec::new();
     let mut buttons = Vec::new();
@@ -71,7 +85,9 @@ pub async fn create_and_post_poll(
     }
 
     if poll_opts.is_empty() {
-        return Err(anyhow!("a poll must have at least one valid option"));
+        let err_msg = "a poll must have at least one valid option";
+        error!(err_msg);
+        return Err(anyhow!(err_msg));
     }
 
     let new_poll = poll::ActiveModel {
@@ -79,7 +95,7 @@ pub async fn create_and_post_poll(
         guild_id: Set(params.guild_id.get().cast_signed()),
         channel_id: Set(params.target_channel_id.get().cast_signed()),
         title: Set(params.title.clone()),
-        ends_at: Set(ends_at.into()),
+        ends_at: Set(ends_at.fixed_offset()),
         is_active: Set(true),
         required_role_id: Set(params.required_role_id.map(|r| r.get().cast_signed())),
         ..Default::default()
@@ -88,14 +104,27 @@ pub async fn create_and_post_poll(
     let poll_model = new_poll
         .insert(db)
         .await
+        .inspect_err(|e| {
+            error!(
+                error = ?e,
+                "failed to insert primary poll record into database"
+            );
+        })
         .context("failed to insert poll into database")?;
 
+    let option_count = poll_opts.len();
     poll_option::Entity::insert_many(poll_opts)
         .exec(db)
         .await
+        .inspect_err(|e| {
+            error!(
+                error = ?e,
+                option_count,
+                "failed to insert poll options into database"
+            );
+        })
         .context("failed to insert poll options into database")?;
 
-    // format action rows (discord limits 5 buttons per row)
     let action_rows: Vec<serenity::CreateActionRow> = buttons
         .chunks(5)
         .map(|chunk| serenity::CreateActionRow::Buttons(chunk.to_vec()))
@@ -108,6 +137,7 @@ pub async fn create_and_post_poll(
         &labels,
         params.required_role_id,
     );
+
     let msg = params
         .target_channel_id
         .send_message(
@@ -117,6 +147,12 @@ pub async fn create_and_post_poll(
                 .components(action_rows),
         )
         .await
+        .inspect_err(|e| {
+            error!(
+                error = ?e,
+                "failed to post poll message to discord channel"
+            );
+        })
         .context("failed to send poll message to channel")?;
 
     let mut poll_am: poll::ActiveModel = poll_model.into();
@@ -125,8 +161,16 @@ pub async fn create_and_post_poll(
     let updated_poll = poll_am
         .update(db)
         .await
+        .inspect_err(|e| {
+            error!(
+                error = ?e,
+                message_id = msg.id.get(),
+                "failed to update poll record with discord message ID"
+            );
+        })
         .context("failed to update poll with message ID")?;
 
+    info!("poll successfully created and posted to discord");
     Ok(updated_poll)
 }
 

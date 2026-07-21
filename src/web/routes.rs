@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 
+pub(super) mod polls;
+
 #[derive(Serialize)]
 pub struct StatusResponse {
     pub status: &'static str,

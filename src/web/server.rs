@@ -4,18 +4,21 @@ use axum::{
     routing::{get, post},
 };
 use poise::serenity_prelude as serenity;
+use sea_orm::DatabaseConnection;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{error, info};
 
-use super::routes::{send_message_handler, status_handler};
-use crate::config::Config;
+use super::routes::{polls::create_poll_handler, send_message_handler, status_handler};
+use crate::{bot::PollCache, config::Config};
 
 #[derive(Clone)]
 pub struct AppState {
     pub http: Arc<serenity::Http>,
     pub shard_manager: Arc<serenity::ShardManager>,
     pub config: Config,
+    pub poll_cache: PollCache,
+    pub db: DatabaseConnection,
 }
 
 pub struct WebServerBuilder {
@@ -23,6 +26,8 @@ pub struct WebServerBuilder {
     shard_manager: Option<Arc<serenity::ShardManager>>,
     config: Option<Config>,
     addr: Option<SocketAddr>,
+    poll_cache: Option<PollCache>,
+    db: Option<DatabaseConnection>,
 }
 
 impl WebServerBuilder {
@@ -32,6 +37,8 @@ impl WebServerBuilder {
             shard_manager: None,
             config: None,
             addr: None,
+            poll_cache: None,
+            db: None,
         }
     }
 
@@ -55,6 +62,16 @@ impl WebServerBuilder {
         self
     }
 
+    pub fn poll_cache(mut self, poll_cache: PollCache) -> Self {
+        self.poll_cache = Some(poll_cache);
+        self
+    }
+
+    pub fn db(mut self, db: DatabaseConnection) -> Self {
+        self.db = Some(db);
+        self
+    }
+
     pub fn build(self) -> Result<WebServer> {
         let http = self
             .http
@@ -68,12 +85,18 @@ impl WebServerBuilder {
         let addr = self
             .addr
             .context("bind address must be provided to WebServerBuilder")?;
+        let poll_cache = self
+            .poll_cache
+            .context("poll cache must be provided to WebServerBuilder")?;
+        let db = self.db.context("db must be provided to WebServerBuilder")?;
 
         Ok(WebServer {
             state: AppState {
                 http,
                 shard_manager,
                 config,
+                poll_cache,
+                db,
             },
             addr,
         })
@@ -102,6 +125,7 @@ impl WebServer {
         let app = Router::new()
             .route("/status", get(status_handler))
             .route("/api/send-message", post(send_message_handler))
+            .route("/api/polls", post(create_poll_handler))
             .with_state(self.state);
 
         tokio::spawn(async move {

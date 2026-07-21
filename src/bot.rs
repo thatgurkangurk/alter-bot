@@ -65,6 +65,8 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
     let commands = features::minecraft::commands(commands);
     let commands = features::quote::commands(commands);
 
+    let poll_cache: PollCache = Arc::new(RwLock::new(HashMap::new()));
+
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands,
@@ -78,29 +80,35 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
             },
             ..Default::default()
         })
-        .setup(move |ctx, _ready, framework| {
-            let http_clone = std::sync::Arc::clone(&ctx.http);
-            let db_clone_fast = db.clone();
-            let db_clone_sync = db.clone();
+        .setup({
+            let poll_cache = Arc::clone(&poll_cache);
+            let bot_db = db.clone();
+            move |ctx, _ready, framework| {
+                let http_clone = std::sync::Arc::clone(&ctx.http);
+                let db_clone_fast = bot_db.clone();
+                let db_clone_sync = bot_db.clone();
 
-            let cache = Arc::new(RwLock::new(HashMap::new()));
-            let cache_clone_fast = Arc::clone(&cache);
-            let cache_clone_sync = Arc::clone(&cache);
+                let cache_clone_fast = Arc::clone(&poll_cache);
+                let cache_clone_sync = Arc::clone(&poll_cache);
 
-            Box::pin(async move {
-                poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                Box::pin(async move {
+                    poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 
-                tokio::spawn(async move {
-                    features::polls::run_fast_loop(http_clone, db_clone_fast, cache_clone_fast)
-                        .await;
-                });
+                    tokio::spawn(async move {
+                        features::polls::run_fast_loop(http_clone, db_clone_fast, cache_clone_fast)
+                            .await;
+                    });
 
-                tokio::spawn(async move {
-                    features::polls::run_sync_loop(db_clone_sync, cache_clone_sync).await;
-                });
+                    tokio::spawn(async move {
+                        features::polls::run_sync_loop(db_clone_sync, cache_clone_sync).await;
+                    });
 
-                Ok(Data { db, cache })
-            })
+                    Ok(Data {
+                        db: bot_db,
+                        cache: poll_cache,
+                    })
+                })
+            }
         })
         .build();
 
@@ -118,6 +126,8 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
         .http(client.http.clone())
         .shard_manager(client.shard_manager.clone())
         .config(config.clone())
+        .poll_cache(poll_cache)
+        .db(db)
         .bind(SocketAddr::from((host, config.web.port.unwrap_or(3000))))
         .build()?
         .run();
