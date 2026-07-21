@@ -60,6 +60,9 @@ jobs:
           cp target/release/alter-bot ./deploy-out/amd64/
         env:
           RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
+          DATA_DIR: "/app/data"
+          APP_VERSION: ${{ steps.bin_version.outputs.VERSION }}
+          IS_IN_CONTAINER: "1"
 
       - name: Build Release Binary (ARM64)
         run: |
@@ -68,6 +71,9 @@ jobs:
           cp target/aarch64-unknown-linux-gnu/release/alter-bot ./deploy-out/arm64/
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          DATA_DIR: "/app/data"
+          APP_VERSION: ${{ steps.bin_version.outputs.VERSION }}
+          IS_IN_CONTAINER: "1"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
