@@ -197,7 +197,7 @@ async fn start_poll(
 
     let ends_at = poll.ends_at.to_utc();
 
-    ctx.data().cache.write().await.insert(poll.id, ends_at);
+    ctx.data().cache.insert(poll.id, ends_at);
 
     let reply = CreateReply::default()
         .content("poll created !")

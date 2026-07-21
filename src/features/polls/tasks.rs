@@ -5,10 +5,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::error;
 
-use crate::bot::PollCache;
+use super::cache::PollCache;
 use crate::models::poll;
 
-/// runs every second, checking the cache.
+/// Runs every second, checking the cache for expired polls and finalizing them.
 #[allow(clippy::too_many_lines)]
 pub async fn run_fast_loop(
     http: Arc<serenity::Http>,
@@ -20,18 +20,8 @@ pub async fn run_fast_loop(
     loop {
         interval.tick().await;
 
-        let mut expired_ids = Vec::new();
-
-        // scope the read lock so we don't block command insertions
-        {
-            let cache_read = cache.read().await;
-            let now = Utc::now();
-            for (&poll_id, &ends_at) in cache_read.iter() {
-                if ends_at <= now {
-                    expired_ids.push(poll_id);
-                }
-            }
-        }
+        // Drain/extract expired poll IDs directly using our cache abstraction
+        let expired_ids = cache.retain_expired();
 
         if expired_ids.is_empty() {
             continue;
@@ -48,16 +38,17 @@ pub async fn run_fast_loop(
                     super::internal::logic::close_and_finalize_poll(&http, &db, &cache, active_poll)
                         .await
                 {
-                    eprintln!("Error finalising poll {poll_id}: {e}");
+                    error!("Error finalizing poll {poll_id}: {e}");
                 }
             } else {
-                cache.write().await.remove(&poll_id);
+                // if it's no longer active in the DB, make sure it's removed from cache
+                cache.remove(&poll_id);
             }
         }
     }
 }
 
-/// runs every 30 seconds, makes sure cache equals db
+/// runs every 30 seconds, making sure cache equals db state.
 pub async fn run_sync_loop(db: sea_orm::DatabaseConnection, cache: PollCache) {
     let mut interval = tokio::time::interval(Duration::from_secs(30));
 
@@ -76,11 +67,12 @@ pub async fn run_sync_loop(db: sea_orm::DatabaseConnection, cache: PollCache) {
             }
         };
 
-        let mut cache_write = cache.write().await;
+        // convert query results into iterator of (Uuid, DateTime<Utc>)
+        let fresh_polls = active_polls
+            .into_iter()
+            .map(|p| (p.id, p.ends_at.with_timezone(&Utc)));
 
-        for p in active_polls {
-            let ends_at_utc = p.ends_at.with_timezone(&Utc);
-            cache_write.insert(p.id, ends_at_utc);
-        }
+        // replaces cache contents and evicts stale/inactive entries
+        cache.sync_all(fresh_polls);
     }
 }

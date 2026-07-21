@@ -11,7 +11,9 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 use super::routes::{polls::create_poll_handler, send_message_handler, status_handler};
-use crate::{bot::PollCache, config::ConfigManager, web::middleware::require_bearer_auth};
+use crate::{
+    config::ConfigManager, features::polls::PollCache, web::middleware::require_bearer_auth,
+};
 
 #[derive(Clone)]
 pub struct AppState {

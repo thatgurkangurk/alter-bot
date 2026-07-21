@@ -8,6 +8,7 @@ use sea_orm::{ActiveModelTrait, QueryFilter, Set, entity::prelude::*};
 
 use super::renderer::generate_results_chart;
 use crate::bot::Error;
+use crate::features::polls::cache::PollCache;
 use crate::features::polls::internal::embed::build_poll_embed;
 use crate::models::{guild, poll, poll_option, vote};
 
@@ -177,14 +178,14 @@ pub async fn create_and_post_poll(
 pub async fn close_and_finalize_poll(
     http: &serenity::Http,
     db: &DatabaseConnection,
-    cache: &crate::bot::PollCache,
+    cache: &PollCache,
     mut poll_model: poll::Model,
 ) -> Result<(), Error> {
     let mut am: poll::ActiveModel = poll_model.clone().into();
     am.is_active = Set(false);
     poll_model = am.update(db).await?;
 
-    cache.write().await.remove(&poll_model.id);
+    cache.remove(&poll_model.id);
 
     let options = poll_option::Entity::find()
         .filter(poll_option::Column::PollId.eq(poll_model.id))

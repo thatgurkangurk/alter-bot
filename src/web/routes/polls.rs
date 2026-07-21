@@ -115,7 +115,7 @@ pub async fn create_poll_handler(
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
 
     let ends_at = poll.ends_at.to_utc();
-    state.poll_cache.write().await.insert(poll.id, ends_at);
+    state.poll_cache.insert(poll.id, ends_at);
 
     // todo: add an endpoint to get a poll (maybe)
     // let location_header = (header::LOCATION, format!("/api/polls/{}", poll.id));

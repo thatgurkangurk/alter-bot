@@ -30,6 +30,7 @@ imageproc = "0.27.0"
 ab_glyph = "0.2.32"
 axum = "0.8.9"
 notify = "8.2.0"
+dashmap = "6.2.1"
 
 
 # --- Global Lint Rules ---
