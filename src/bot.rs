@@ -109,14 +109,16 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
         .await
         .map_err(|e| anyhow::anyhow!("failed to create client: {e}"))?;
 
+    let host = match std::env::var("IS_IN_CONTAINER").as_deref() {
+        Ok("1") => [0, 0, 0, 0],
+        _ => [127, 0, 0, 1],
+    };
+
     WebServer::builder()
         .http(client.http.clone())
         .shard_manager(client.shard_manager.clone())
         .config(config.clone())
-        .bind(SocketAddr::from((
-            [127, 0, 0, 1],
-            config.web.port.unwrap_or(3000),
-        )))
+        .bind(SocketAddr::from((host, config.web.port.unwrap_or(3000))))
         .build()?
         .run();
 
