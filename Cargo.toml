@@ -7,24 +7,24 @@ license = "MPL-2.0"
 authors = ["gurkan"]
 
 [dependencies]
-anyhow = "1.0.102"
-config = { version = "0.15.22", default-features = false, features = ["toml"] }
+anyhow = "1.0.104"
+config = { version = "0.15.25", default-features = false, features = ["toml"] }
 poise = "0.6.2"
-serde = { version = "1.0.228", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
 serenity = "0.12.5"
-tokio = { version = "1.52.2", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter"] }
 sea-orm = { version = "^2.0.0", features = ["runtime-tokio-rustls", "entity-registry", "schema-sync", "sqlx-postgres"] }
-uuid = { version = "1.23.1", features = ["v4"] }
-chrono = "0.4.44"
+uuid = { version = "1.24.0", features = ["v4"] }
+chrono = "0.4.45"
 craftping = { version = "0.7.0", features = ["async-tokio"] }
-serde_json = "1.0.150"
+serde_json = "1.0.151"
 ferinth = "2.13.1"
 reqwest = "0.13.4"
 url = "2.5.8"
-toml = "1.1.2"
-futures = "0.3.32"
+toml = "1.1.3"
+futures = "0.3.33"
 image = "0.25.10"
 imageproc = "0.27.0"
 ab_glyph = "0.2.32"
