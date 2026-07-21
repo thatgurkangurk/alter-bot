@@ -32,6 +32,12 @@ pub struct BotConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct WebConfig {
+    pub tokens: Vec<String>,
+    pub port: Option<u16>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct DatabaseConfig {
     pub uri: String,
 }
@@ -40,6 +46,7 @@ pub struct DatabaseConfig {
 pub struct Config {
     pub bot: BotConfig,
     pub db: DatabaseConfig,
+    pub web: WebConfig,
 }
 
 impl Config {

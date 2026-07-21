@@ -12,6 +12,7 @@ mod db;
 mod features;
 mod models;
 mod util;
+mod web;
 
 fn print_startup_info() {
     info!("==========================================");

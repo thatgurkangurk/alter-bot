@@ -2,12 +2,12 @@ use ::serenity::Client;
 use chrono::{DateTime, Utc};
 use poise::{CreateReply, serenity_prelude as serenity};
 use sea_orm::DatabaseConnection;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{config::Config, consts, db::create_db, features};
+use crate::{config::Config, consts, db::create_db, features, web::WebServer};
 
 pub type PollCache = Arc<RwLock<HashMap<Uuid, DateTime<Utc>>>>;
 pub struct Data {
@@ -108,6 +108,17 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
         .framework(framework)
         .await
         .map_err(|e| anyhow::anyhow!("failed to create client: {e}"))?;
+
+    WebServer::builder()
+        .http(client.http.clone())
+        .shard_manager(client.shard_manager.clone())
+        .config(config.clone())
+        .bind(SocketAddr::from((
+            [127, 0, 0, 1],
+            config.web.port.unwrap_or(3000),
+        )))
+        .build()?
+        .run();
 
     Ok(client)
 }
