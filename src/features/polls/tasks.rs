@@ -8,7 +8,7 @@ use tracing::error;
 use super::cache::PollCache;
 use crate::models::poll;
 
-/// Runs every second, checking the cache for expired polls and finalizing them.
+/// runs every second, checking the cache for expired polls and finalising them.
 #[allow(clippy::too_many_lines)]
 pub async fn run_fast_loop(
     http: Arc<serenity::Http>,
@@ -20,7 +20,7 @@ pub async fn run_fast_loop(
     loop {
         interval.tick().await;
 
-        // Drain/extract expired poll IDs directly using our cache abstraction
+        // Drain/extract expired poll ids
         let expired_ids = cache.retain_expired();
 
         if expired_ids.is_empty() {

@@ -84,31 +84,23 @@ pub async fn create_bot(config_manager: &ConfigManager) -> anyhow::Result<Client
         })
         .setup({
             let bot_db = db.clone();
-            let setup_poll_cache = poll_cache.clone();
+            let poll_cache_setup = poll_cache.clone();
 
             move |ctx, _ready, framework| {
                 let http_clone = std::sync::Arc::clone(&ctx.http);
-                let db_clone_fast = bot_db.clone();
-                let db_clone_sync = bot_db.clone();
+                let db_clone = bot_db.clone();
 
-                let cache_fast = setup_poll_cache.clone();
-                let cache_sync = setup_poll_cache.clone();
-                let cache_data = setup_poll_cache.clone();
+                let cache_for_tasks = poll_cache_setup.clone();
+                let cache_for_data = poll_cache_setup.clone();
 
                 Box::pin(async move {
                     poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 
-                    tokio::spawn(async move {
-                        features::polls::run_fast_loop(http_clone, db_clone_fast, cache_fast).await;
-                    });
-
-                    tokio::spawn(async move {
-                        features::polls::run_sync_loop(db_clone_sync, cache_sync).await;
-                    });
+                    features::polls::spawn_background_tasks(http_clone, db_clone, cache_for_tasks);
 
                     Ok(Data {
                         db: bot_db,
-                        cache: cache_data,
+                        cache: cache_for_data,
                     })
                 })
             }
