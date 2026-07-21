@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{config::Config, consts, db::create_db, features, web::WebServer};
+use crate::{config::ConfigManager, consts, db::create_db, features, web::WebServer};
 
 pub type PollCache = Arc<RwLock<HashMap<Uuid, DateTime<Utc>>>>;
 pub struct Data {
@@ -53,10 +53,10 @@ async fn event_handler(
     Ok(())
 }
 
-pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
+pub async fn create_bot(config_manager: &ConfigManager) -> anyhow::Result<Client> {
     let intents = serenity::GatewayIntents::GUILDS;
 
-    let db = create_db(config).await?;
+    let db = create_db(config_manager).await?;
 
     let commands = vec![info(), features::awty::are_we_there_yet()];
 
@@ -112,7 +112,7 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
         })
         .build();
 
-    let client = serenity::ClientBuilder::new(&config.bot.token, intents)
+    let client = serenity::ClientBuilder::new(&config_manager.get().await.bot.token, intents)
         .framework(framework)
         .await
         .map_err(|e| anyhow::anyhow!("failed to create client: {e}"))?;
@@ -125,10 +125,13 @@ pub async fn create_bot(config: &Config) -> anyhow::Result<Client> {
     WebServer::builder()
         .http(client.http.clone())
         .shard_manager(client.shard_manager.clone())
-        .config(config.clone())
+        .config_manager(config_manager.clone())
         .poll_cache(poll_cache)
         .db(db)
-        .bind(SocketAddr::from((host, config.web.port.unwrap_or(3000))))
+        .bind(SocketAddr::from((
+            host,
+            config_manager.get().await.web.port.unwrap_or(3000),
+        )))
         .build()?
         .run();
 

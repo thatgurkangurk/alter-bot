@@ -10,13 +10,13 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 use super::routes::{polls::create_poll_handler, send_message_handler, status_handler};
-use crate::{bot::PollCache, config::Config};
+use crate::{bot::PollCache, config::ConfigManager};
 
 #[derive(Clone)]
 pub struct AppState {
     pub http: Arc<serenity::Http>,
     pub shard_manager: Arc<serenity::ShardManager>,
-    pub config: Config,
+    pub config_manager: ConfigManager,
     pub poll_cache: PollCache,
     pub db: DatabaseConnection,
 }
@@ -24,7 +24,7 @@ pub struct AppState {
 pub struct WebServerBuilder {
     http: Option<Arc<serenity::Http>>,
     shard_manager: Option<Arc<serenity::ShardManager>>,
-    config: Option<Config>,
+    config_manager: Option<ConfigManager>,
     addr: Option<SocketAddr>,
     poll_cache: Option<PollCache>,
     db: Option<DatabaseConnection>,
@@ -35,7 +35,7 @@ impl WebServerBuilder {
         Self {
             http: None,
             shard_manager: None,
-            config: None,
+            config_manager: None,
             addr: None,
             poll_cache: None,
             db: None,
@@ -52,8 +52,8 @@ impl WebServerBuilder {
         self
     }
 
-    pub fn config(mut self, config: Config) -> Self {
-        self.config = Some(config);
+    pub fn config_manager(mut self, config_manager: ConfigManager) -> Self {
+        self.config_manager = Some(config_manager);
         self
     }
 
@@ -80,7 +80,7 @@ impl WebServerBuilder {
             .shard_manager
             .context("shard_manager must be provided to WebServerBuilder")?;
         let config = self
-            .config
+            .config_manager
             .context("config must be provided to WebServerBuilder")?;
         let addr = self
             .addr
@@ -94,7 +94,7 @@ impl WebServerBuilder {
             state: AppState {
                 http,
                 shard_manager,
-                config,
+                config_manager: config,
                 poll_cache,
                 db,
             },

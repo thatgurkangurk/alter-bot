@@ -58,7 +58,14 @@ pub async fn send_message_handler(
     let is_authorised = match auth_header {
         Some(header) if header.starts_with("Bearer ") => {
             let token = &header["Bearer ".len()..];
-            state.config.web.tokens.iter().any(|t| t == token)
+            state
+                .config_manager
+                .get()
+                .await
+                .web
+                .tokens
+                .iter()
+                .any(|t| t == token)
         }
         _ => false,
     };

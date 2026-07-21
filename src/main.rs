@@ -3,7 +3,8 @@ use std::path::Path;
 use tracing::{info, warn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-use crate::{bot::create_bot, config::Config};
+use crate::{bot::create_bot, config::ConfigManager};
+use anyhow::Result;
 
 mod bot;
 mod config;
@@ -22,7 +23,7 @@ fn print_startup_info() {
     info!("==========================================");
 }
 
-fn load_config() -> anyhow::Result<Config> {
+fn load_config_manager() -> Result<ConfigManager> {
     let default_path = Path::new(consts::DATA_DIR).join("alter-bot.toml");
 
     if !default_path.exists() {
@@ -42,7 +43,7 @@ fn load_config() -> anyhow::Result<Config> {
         }
     }
 
-    Config::load(Some(&default_path))
+    ConfigManager::new(Some(&default_path))
 }
 
 #[tokio::main]
@@ -59,9 +60,11 @@ async fn main() -> anyhow::Result<()> {
 
     print_startup_info();
 
-    let config = load_config()?;
+    let config_manager = load_config_manager()?;
 
-    let mut bot = create_bot(&config).await?;
+    config_manager.watch()?;
+
+    let mut bot = create_bot(&config_manager).await?;
 
     if let Err(why) = bot.start().await {
         tracing::error!("bot crashed: {:?}", why);

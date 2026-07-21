@@ -1,4 +1,4 @@
-use crate::Config;
+use crate::config::ConfigManager;
 use sea_orm::{ConnectionTrait, Database, DatabaseConnection};
 use tracing::info;
 
@@ -57,8 +57,8 @@ async fn auto_migrate_polls_to_v2(db: &sea_orm::DatabaseConnection) -> anyhow::R
     Ok(())
 }
 
-pub async fn create_db(config: &Config) -> anyhow::Result<DatabaseConnection> {
-    let db = Database::connect(&config.db.uri).await?;
+pub async fn create_db(config_manager: &ConfigManager) -> anyhow::Result<DatabaseConnection> {
+    let db = Database::connect(&config_manager.get().await.db.uri).await?;
 
     auto_migrate_polls_to_v2(&db).await?;
 

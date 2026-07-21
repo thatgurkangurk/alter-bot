@@ -1,7 +1,10 @@
-use std::path::Path;
-
 use anyhow::{Context, Result};
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{error, info, warn};
 
 use crate::util::validate_token;
 
@@ -49,6 +52,12 @@ pub struct Config {
     pub web: WebConfig,
 }
 
+#[derive(Clone)]
+pub struct ConfigManager {
+    inner: Arc<RwLock<Config>>,
+    path: Option<PathBuf>,
+}
+
 impl Config {
     pub fn load(path: Option<&Path>) -> Result<Self> {
         let file_source = path
@@ -62,5 +71,70 @@ impl Config {
             .context("failed to load the config")?
             .try_deserialize()
             .context("failed to deserialize the config")
+    }
+}
+
+impl ConfigManager {
+    pub fn new(path: Option<&Path>) -> Result<Self> {
+        let config = Config::load(path)?;
+
+        Ok(Self {
+            inner: Arc::new(RwLock::new(config)),
+            path: path.map(Path::to_path_buf),
+        })
+    }
+
+    pub async fn get(&self) -> Config {
+        self.inner.read().await.clone()
+    }
+
+    pub async fn reload(&self) -> Result<()> {
+        let new_config = Config::load(self.path.as_deref())?;
+
+        {
+            let mut writer = self.inner.write().await;
+            *writer = new_config;
+        }
+
+        Ok(())
+    }
+
+    pub fn watch(&self) -> anyhow::Result<()> {
+        let Some(path) = &self.path else {
+            warn!("no file path associated with the config manager. watcher skipped.");
+            return Ok(());
+        };
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let mut watcher = RecommendedWatcher::new(
+            move |res: Result<Event, notify::Error>| {
+                if let Ok(event) = res {
+                    let _ = tx.send(event);
+                }
+            },
+            notify::Config::default(),
+        )?;
+
+        watcher.watch(path, RecursiveMode::NonRecursive)?;
+
+        let manager = self.clone();
+        tokio::spawn(async move {
+            let _watcher = watcher;
+
+            while let Some(event) = rx.recv().await {
+                if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+                    info!("config file update detected. reloading...");
+
+                    if let Err(err) = manager.reload().await {
+                        error!("auto-reload failed: {:#}", err);
+                    } else {
+                        info!("config reloaded successfully.");
+                    }
+                }
+            }
+        });
+
+        Ok(())
     }
 }
