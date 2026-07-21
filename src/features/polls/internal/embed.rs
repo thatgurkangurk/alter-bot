@@ -16,7 +16,14 @@ pub fn build_poll_embed(
         "### **choices**".to_string(),
     ];
 
-    for (index, label) in options.iter().enumerate() {
+    let mut sorted_options = options.to_vec();
+    sorted_options.sort_by(|a, b| {
+        let pos_a = options.iter().position(|x| x == a).unwrap_or(0);
+        let pos_b = options.iter().position(|x| x == b).unwrap_or(0);
+        pos_a.cmp(&pos_b)
+    });
+
+    for (index, label) in sorted_options.iter().enumerate() {
         let index_u32 = u32::try_from(index).unwrap_or(0);
 
         let emoji =

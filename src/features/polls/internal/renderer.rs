@@ -24,7 +24,11 @@ pub fn generate_results_chart(options: &[poll_option::Model], votes: &[vote::Mod
         option_results.push((opt, raw_count, score));
     }
 
-    option_results.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+    option_results.sort_by(|a, b| {
+        let pos_a = options.iter().position(|o| o.id == a.0.id).unwrap_or(0);
+        let pos_b = options.iter().position(|o| o.id == b.0.id).unwrap_or(0);
+        pos_a.cmp(&pos_b)
+    });
 
     let max_bar_len: f64 = 10.0;
     let make_bar = |score: f64| -> String {
