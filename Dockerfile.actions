@@ -1,5 +1,7 @@
 FROM debian:trixie-slim AS runtime
 
+ARG TARGETARCH
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata && \
@@ -19,7 +21,7 @@ RUN groupadd -g ${GID} alter && \
 
 RUN mkdir -p /app/data && chown alter:alter /app/data
 
-COPY ./deploy-out/alter-bot /usr/local/bin/alter-bot
+COPY ./deploy-out/${TARGETARCH}/alter-bot /usr/local/bin/alter-bot
 
 USER alter
 

@@ -42,24 +42,35 @@ jobs:
         with:
           install: true
 
-      - name: Install mold & build-essential
-        run: sudo apt-get update && sudo apt-get install -y mold build-essential
+      - name: Install dependencies (mold & ARM cross-compiler)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold build-essential gcc-aarch64-linux-gnu
+          rustup target add aarch64-unknown-linux-gnu
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: debian-gnu-fast
+          key: debian-multiarch
 
-      - name: Build Release Binary
+      - name: Build Release Binary (AMD64)
         run: |
           cargo build --release
-          mkdir -p ./deploy-out
-          cp target/release/alter-bot ./deploy-out/
+          mkdir -p ./deploy-out/amd64
+          cp target/release/alter-bot ./deploy-out/amd64/
         env:
           RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
-          DATA_DIR: "/app/data"
-          APP_VERSION: ${{ steps.bin_version.outputs.VERSION }}
-          IS_IN_CONTAINER: "1"
+
+      - name: Build Release Binary (ARM64)
+        run: |
+          cargo build --release --target aarch64-unknown-linux-gnu
+          mkdir -p ./deploy-out/arm64
+          cp target/aarch64-unknown-linux-gnu/release/alter-bot ./deploy-out/arm64/
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -78,19 +89,16 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ steps.commit.outputs.short }},enable=${{ github.ref_name == 'main' }}
-
-            # we test in production fellas
             type=raw,value=we-test-in-production,enable=${{ github.ref_name == 'main' }}
-
-            # on version tag: use the tag itself (e.g., 0.0.1) and "latest"
             type=ref,event=tag
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
-      - name: Build and push
+      - name: Build and push multi-arch
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
