@@ -1,3 +1,4 @@
+#![allow(clippy::future_not_send)]
 pub mod guild;
 pub mod poll;
 pub mod poll_option;
