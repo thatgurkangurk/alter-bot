@@ -3,12 +3,7 @@ use crate::{
     models::poll,
     web::AppState,
 };
-use axum::{
-    Json,
-    extract::State,
-    http::{HeaderMap, StatusCode, header},
-    response::IntoResponse,
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use poise::serenity_prelude::{ChannelId, GuildId, RoleId};
 use serde::Deserialize;
 
@@ -58,35 +53,8 @@ impl From<poll::Model> for PollResponse {
 
 pub async fn create_poll_handler(
     State(state): State<AppState>,
-    headers: HeaderMap,
     Json(payload): Json<CreatePollRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let auth_header = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok());
-
-    let is_authorised = match auth_header {
-        Some(header) if header.starts_with("Bearer ") => {
-            let token = &header["Bearer ".len()..];
-            state
-                .config_manager
-                .get()
-                .await
-                .web
-                .tokens
-                .iter()
-                .any(|t| t == token)
-        }
-        _ => false,
-    };
-
-    if !is_authorised {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            "Unauthorised: Invalid or missing bearer token".to_string(),
-        ));
-    }
-
     if payload.options.len() < 2 {
         return Err((
             StatusCode::BAD_REQUEST,

@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use axum::{
     Router,
+    middleware::from_fn_with_state,
     routing::{get, post},
 };
 use poise::serenity_prelude as serenity;
@@ -10,7 +11,7 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 use super::routes::{polls::create_poll_handler, send_message_handler, status_handler};
-use crate::{bot::PollCache, config::ConfigManager};
+use crate::{bot::PollCache, config::ConfigManager, web::middleware::require_bearer_auth};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -122,10 +123,15 @@ impl WebServer {
     /// spawns the axum web server in a background task
     pub fn run(self) {
         let addr = self.addr;
-        let app = Router::new()
-            .route("/status", get(status_handler))
+
+        let protected_routes = Router::new()
             .route("/api/send-message", post(send_message_handler))
             .route("/api/polls", post(create_poll_handler))
+            .route_layer(from_fn_with_state(self.state.clone(), require_bearer_auth));
+
+        let app = Router::new()
+            .route("/status", get(status_handler))
+            .merge(protected_routes)
             .with_state(self.state);
 
         tokio::spawn(async move {

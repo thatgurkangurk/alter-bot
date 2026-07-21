@@ -1,10 +1,5 @@
 use ::serenity::model::id::{ChannelId, MessageId};
-use axum::{
-    Json,
-    extract::State,
-    http::{HeaderMap, StatusCode, header},
-    response::IntoResponse,
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use poise::serenity_prelude as serenity;
 use serde::{Deserialize, Serialize};
 
@@ -48,35 +43,8 @@ pub struct MessageRequest {
 
 pub async fn send_message_handler(
     State(state): State<AppState>,
-    headers: HeaderMap,
     Json(body): Json<MessageRequest>,
 ) -> impl IntoResponse {
-    let auth_header = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok());
-
-    let is_authorised = match auth_header {
-        Some(header) if header.starts_with("Bearer ") => {
-            let token = &header["Bearer ".len()..];
-            state
-                .config_manager
-                .get()
-                .await
-                .web
-                .tokens
-                .iter()
-                .any(|t| t == token)
-        }
-        _ => false,
-    };
-
-    if !is_authorised {
-        return (
-            StatusCode::UNAUTHORIZED,
-            "Unauthorised: Invalid or missing bearer token".to_string(),
-        );
-    }
-
     let channel_id: ChannelId = match body.channel_id.parse::<u64>() {
         Ok(id) => ChannelId::new(id),
         Err(_) => {

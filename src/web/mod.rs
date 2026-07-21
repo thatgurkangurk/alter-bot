@@ -1,3 +1,4 @@
+pub mod middleware;
 mod routes;
 mod server;
 
