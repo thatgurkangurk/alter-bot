@@ -1,11 +1,10 @@
-use chrono::{Duration, Utc};
-use poise::{Modal, serenity_prelude as serenity};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
-use uuid::Uuid;
+use anyhow::anyhow;
+use poise::{CreateReply, Modal, serenity_prelude as serenity};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use super::internal::embed::build_poll_embed;
 use super::internal::renderer::generate_results_chart;
 use crate::bot::{Context, Data, Error};
+use crate::features::polls::internal::logic::{CreatePollParams, create_and_post_poll};
 use crate::features::polls::modal::NewPollModal;
 use crate::models::{poll, poll_option, vote};
 
@@ -170,96 +169,42 @@ async fn start_poll(
         serenity::RoleId,
     >,
 ) -> Result<(), Error> {
-    use super::modal::parse_weight;
-
     let data = NewPollModal::execute(ctx).await?;
     let Some(data) = data else { return Ok(()) };
 
-    let ends_at = Utc::now() + Duration::minutes(duration_minutes);
-    let poll_id = Uuid::new_v4();
-    let guild_id = ctx.guild_id().ok_or("must be run in a guild")?;
+    let guild_id = ctx
+        .guild_id()
+        .ok_or_else(|| anyhow!("must be run in a guild"))?;
 
     let mut raw_inputs = vec![Some(data.opt_1), Some(data.opt_2), data.opt_3];
     if let Some(bulk) = data.opt_bulk {
         raw_inputs.extend(bulk.split(',').map(|s| Some(s.trim().to_string())));
     }
 
-    let mut poll_opts = Vec::new();
-    let mut buttons = Vec::new();
-    let mut labels = Vec::new();
+    let poll = create_and_post_poll(
+        &ctx.data().db,
+        ctx.http(),
+        CreatePollParams {
+            title: data.title,
+            guild_id,
+            target_channel_id: target_channel.id,
+            duration_minutes,
+            required_role_id,
+            raw_inputs,
+        },
+    )
+    .await?;
 
-    for (index, raw) in raw_inputs.into_iter().flatten().enumerate() {
-        if raw.trim().is_empty() {
-            continue;
-        }
+    let ends_at = poll.ends_at.to_utc();
 
-        let parts: Vec<&str> = raw.split(':').collect();
-        let label = parts[0].trim().to_string();
-        let weight_opt = parts.get(1).map(|s| s.trim().to_string());
-        let weight = parse_weight(weight_opt);
+    ctx.data().cache.write().await.insert(poll.id, ends_at);
 
-        let index_u32 = u32::try_from(index).unwrap_or(0);
-        let emoji = char::from_u32(0x1F1E6 + index_u32);
+    let reply = CreateReply::default()
+        .content("poll created !")
+        .reply(true)
+        .ephemeral(true);
 
-        let opt_id = Uuid::new_v4();
-        poll_opts.push(poll_option::ActiveModel {
-            id: Set(opt_id),
-            poll_id: Set(poll_id),
-            label: Set(label.clone()),
-            weight: Set(weight),
-        });
-
-        labels.push(label.clone());
-
-        let mut button = serenity::CreateButton::new(format!("vote_{opt_id}_{poll_id}"))
-            .label(label)
-            .style(serenity::ButtonStyle::Secondary);
-
-        if let Some(e) = emoji {
-            button = button.emoji(e);
-        }
-
-        buttons.push(button);
-    }
-
-    let new_poll = poll::ActiveModel {
-        id: Set(poll_id),
-        guild_id: Set(guild_id.get().cast_signed()),
-        channel_id: Set(target_channel.id.get().cast_signed()),
-        title: Set(data.title),
-        ends_at: Set(ends_at.into()),
-        is_active: Set(true),
-        required_role_id: Set(required_role_id.map(|r| r.get().cast_signed())),
-        ..Default::default()
-    };
-    let poll_model = new_poll.insert(&ctx.data().db).await?;
-
-    poll_option::Entity::insert_many(poll_opts)
-        .exec(&ctx.data().db)
-        .await?;
-
-    let action_rows: Vec<serenity::CreateActionRow> = buttons
-        .chunks(5)
-        .map(|chunk| serenity::CreateActionRow::Buttons(chunk.to_vec()))
-        .collect();
-
-    let embed = build_poll_embed(&poll_model.title, ends_at, 0, &labels, required_role_id);
-    let msg = target_channel
-        .id
-        .send_message(
-            ctx.http(),
-            serenity::CreateMessage::new()
-                .embed(embed)
-                .components(action_rows),
-        )
-        .await?;
-
-    let mut poll_am: poll::ActiveModel = poll_model.into();
-    poll_am.message_id = Set(Some(msg.id.get().cast_signed()));
-    poll_am.update(&ctx.data().db).await?;
-    ctx.data().cache.write().await.insert(poll_id, ends_at);
-
-    ctx.say("poll created !").await?;
+    ctx.send(reply).await?;
     Ok(())
 }
 

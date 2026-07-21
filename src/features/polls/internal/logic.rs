@@ -1,10 +1,134 @@
-use super::renderer::generate_results_chart;
-use crate::bot::Error;
-use crate::models::{guild, poll, poll_option, vote};
-use poise::serenity_prelude as serenity;
-use sea_orm::{ActiveModelTrait, QueryFilter, Set, entity::prelude::*};
 use std::collections::HashMap;
 use std::fmt::Write;
+
+use anyhow::{Context, Result, anyhow};
+use chrono::{Duration, Utc};
+use poise::serenity_prelude as serenity;
+use sea_orm::{ActiveModelTrait, QueryFilter, Set, entity::prelude::*};
+
+use super::renderer::generate_results_chart;
+use crate::bot::Error;
+use crate::features::polls::internal::embed::build_poll_embed;
+use crate::models::{guild, poll, poll_option, vote};
+
+pub struct CreatePollParams {
+    pub title: String,
+    pub guild_id: serenity::GuildId,
+    pub target_channel_id: serenity::ChannelId,
+    pub duration_minutes: i64,
+    pub required_role_id: Option<serenity::RoleId>,
+    pub raw_inputs: Vec<Option<String>>,
+}
+
+/// creates a new poll and sends a message in the discord channel
+pub async fn create_and_post_poll(
+    db: &DatabaseConnection,
+    http: impl serenity::CacheHttp,
+    params: CreatePollParams,
+) -> Result<poll::Model> {
+    use super::super::modal::parse_weight;
+
+    let ends_at = Utc::now() + Duration::minutes(params.duration_minutes);
+    let poll_id = Uuid::new_v4();
+
+    let mut poll_opts = Vec::new();
+    let mut buttons = Vec::new();
+    let mut labels = Vec::new();
+
+    for (index, raw) in params.raw_inputs.into_iter().flatten().enumerate() {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = trimmed.split(':').collect();
+        let label = parts[0].trim().to_string();
+        let weight_opt = parts.get(1).map(|s| s.trim().to_string());
+        let weight = parse_weight(weight_opt);
+
+        let index_u32 = u32::try_from(index).unwrap_or(0);
+        let emoji = char::from_u32(0x1F1E6 + index_u32);
+
+        let opt_id = Uuid::new_v4();
+        poll_opts.push(poll_option::ActiveModel {
+            id: Set(opt_id),
+            poll_id: Set(poll_id),
+            label: Set(label.clone()),
+            weight: Set(weight),
+        });
+
+        labels.push(label.clone());
+
+        let mut button = serenity::CreateButton::new(format!("vote_{opt_id}_{poll_id}"))
+            .label(label)
+            .style(serenity::ButtonStyle::Secondary);
+
+        if let Some(e) = emoji {
+            button = button.emoji(e);
+        }
+
+        buttons.push(button);
+    }
+
+    if poll_opts.is_empty() {
+        return Err(anyhow!("a poll must have at least one valid option"));
+    }
+
+    let new_poll = poll::ActiveModel {
+        id: Set(poll_id),
+        guild_id: Set(params.guild_id.get().cast_signed()),
+        channel_id: Set(params.target_channel_id.get().cast_signed()),
+        title: Set(params.title.clone()),
+        ends_at: Set(ends_at.into()),
+        is_active: Set(true),
+        required_role_id: Set(params.required_role_id.map(|r| r.get().cast_signed())),
+        ..Default::default()
+    };
+
+    let poll_model = new_poll
+        .insert(db)
+        .await
+        .context("failed to insert poll into database")?;
+
+    poll_option::Entity::insert_many(poll_opts)
+        .exec(db)
+        .await
+        .context("failed to insert poll options into database")?;
+
+    // format action rows (discord limits 5 buttons per row)
+    let action_rows: Vec<serenity::CreateActionRow> = buttons
+        .chunks(5)
+        .map(|chunk| serenity::CreateActionRow::Buttons(chunk.to_vec()))
+        .collect();
+
+    let embed = build_poll_embed(
+        &poll_model.title,
+        ends_at,
+        0,
+        &labels,
+        params.required_role_id,
+    );
+    let msg = params
+        .target_channel_id
+        .send_message(
+            http,
+            serenity::CreateMessage::new()
+                .embed(embed)
+                .components(action_rows),
+        )
+        .await
+        .context("failed to send poll message to channel")?;
+
+    let mut poll_am: poll::ActiveModel = poll_model.into();
+    poll_am.message_id = Set(Some(msg.id.get().cast_signed()));
+
+    let updated_poll = poll_am
+        .update(db)
+        .await
+        .context("failed to update poll with message ID")?;
+
+    Ok(updated_poll)
+}
 
 pub async fn close_and_finalize_poll(
     http: &serenity::Http,
