@@ -35,7 +35,7 @@ pub async fn run_fast_loop(
 
             if let Ok(Some(active_poll)) = poll_opt {
                 if let Err(e) =
-                    super::internal::logic::close_and_finalize_poll(&http, &db, &cache, active_poll)
+                    super::internal::logic::close_and_finalise_poll(&http, &db, &cache, active_poll)
                         .await
                 {
                     error!("Error finalizing poll {poll_id}: {e}");

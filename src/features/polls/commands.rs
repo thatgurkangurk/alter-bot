@@ -34,7 +34,7 @@ async fn end_poll_command(
             )
             .await?;
 
-            super::internal::logic::close_and_finalize_poll(
+            super::internal::logic::close_and_finalise_poll(
                 ctx.http(),
                 &ctx.data().db,
                 &ctx.data().cache,

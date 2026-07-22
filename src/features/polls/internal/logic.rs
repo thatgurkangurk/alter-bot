@@ -9,7 +9,6 @@ use sea_orm::{ActiveModelTrait, QueryFilter, Set, entity::prelude::*};
 use serde::Deserialize;
 
 use super::renderer::generate_results_chart;
-use crate::bot::Error;
 use crate::features::polls::cache::PollCache;
 use crate::features::polls::internal::embed::build_poll_embed;
 use crate::models::{guild, poll, poll_option, vote};
@@ -223,27 +222,46 @@ pub async fn create_and_post_poll(
     Ok(updated_poll)
 }
 
-pub async fn close_and_finalize_poll(
+#[tracing::instrument(
+    skip(http, db, cache, poll_model),
+    fields(
+        poll_id = %poll_model.id,
+        guild_id = poll_model.guild_id,
+        channel_id = poll_model.channel_id,
+        message_id = ?poll_model.message_id,
+        title = %poll_model.title
+    )
+)]
+#[allow(clippy::too_many_lines)]
+pub async fn close_and_finalise_poll(
     http: &serenity::Http,
     db: &DatabaseConnection,
     cache: &PollCache,
     mut poll_model: poll::Model,
-) -> Result<(), Error> {
-    let mut am: poll::ActiveModel = poll_model.clone().into();
-    am.is_active = Set(false);
-    poll_model = am.update(db).await?;
-
-    cache.remove(&poll_model.id);
-
+) -> Result<(), anyhow::Error> {
     let options = poll_option::Entity::find()
         .filter(poll_option::Column::PollId.eq(poll_model.id))
         .all(db)
-        .await?;
+        .await
+        .inspect_err(|e| {
+            error!(
+                error = ?e,
+                "failed to fetch poll options from database during finalisation"
+            );
+        })
+        .context("failed to fetch options for finalising poll")?;
 
     let votes = vote::Entity::find()
         .filter(vote::Column::PollId.eq(poll_model.id))
         .all(db)
-        .await?;
+        .await
+        .inspect_err(|e| {
+            error!(
+                error = ?e,
+                "failed to fetch poll votes from database during finalisation"
+            );
+        })
+        .context("failed to fetch votes for finalising poll")?;
 
     let chart = generate_results_chart(&options, &votes);
 
@@ -255,7 +273,6 @@ pub async fn close_and_finalize_poll(
 
     for (index, opt) in options.iter().enumerate() {
         let index_u32 = u32::try_from(index).unwrap_or(0);
-
         let emoji =
             char::from_u32(0x1F1E6 + index_u32).map_or_else(|| "🔹".to_string(), |c| c.to_string());
 
@@ -278,16 +295,41 @@ pub async fn close_and_finalize_poll(
         .description(description)
         .color(serenity::Colour::RED);
 
+    // update the original poll message (remove buttons, add final results embed)
     if let Some(msg_id) = poll_model.message_id {
         let channel_id = serenity::ChannelId::new(poll_model.channel_id.cast_unsigned());
         let message_id = serenity::MessageId::new(msg_id.cast_unsigned());
 
         let builder = serenity::EditMessage::new()
             .embed(results_embed)
-            .components(vec![]); // removes the buttons since the poll is closed
+            .components(vec![]); // removes buttons
 
-        let _ = channel_id.edit_message(&http, message_id, builder).await;
+        if let Err(e) = channel_id.edit_message(http, message_id, builder).await {
+            error!(
+                error = ?e,
+                channel_id = channel_id.get(),
+                message_id = message_id.get(),
+                "failed to update poll discord message with final results"
+            );
+        }
     }
+
+    // mark active = false in db and update cache AFTER discord ui attempt
+    let mut am: poll::ActiveModel = poll_model.clone().into();
+    am.is_active = Set(false);
+
+    poll_model = am
+        .update(db)
+        .await
+        .inspect_err(|e| {
+            error!(
+                error = ?e,
+                "failed to update poll status to inactive in database"
+            );
+        })
+        .context("failed to mark poll as inactive in database")?;
+
+    cache.remove(&poll_model.id);
 
     if let Ok(Some(guild_config)) = guild::Entity::find_by_id(poll_model.guild_id).one(db).await
         && let Some(log_channel_id) = guild_config.log_channel_id
@@ -295,10 +337,9 @@ pub async fn close_and_finalize_poll(
         let log_channel = serenity::ChannelId::new(log_channel_id.cast_unsigned());
         let guild_id = serenity::GuildId::new(poll_model.guild_id.cast_unsigned());
 
-        // group votes by option_id
         let mut grouped_votes: HashMap<uuid::Uuid, Vec<i64>> = HashMap::new();
         for opt in &options {
-            grouped_votes.insert(opt.id, Vec::new()); // ensure every option exists in the map
+            grouped_votes.insert(opt.id, Vec::new());
         }
 
         for v in &votes {
@@ -313,28 +354,24 @@ pub async fn close_and_finalize_poll(
             poll_model.title
         );
 
-        // iterate over the dynamic options to build the log output
         for (i, opt) in options.iter().enumerate() {
             let _ = writeln!(log_content, "{}", opt.label);
             let _ = writeln!(log_content, "----");
 
-            let user_ids = grouped_votes
-                .get(&opt.id)
-                .ok_or_else(|| anyhow::anyhow!("failed to find votes for option: {}", opt.id))?;
+            if let Some(user_ids) = grouped_votes.get(&opt.id) {
+                if user_ids.is_empty() {
+                    let _ = writeln!(log_content, "no one voted for this");
+                } else {
+                    for &id in user_ids {
+                        let user_id = serenity::UserId::new(id.cast_unsigned());
 
-            if user_ids.is_empty() {
-                let _ = writeln!(log_content, "no one voted for this");
-            } else {
-                for &id in user_ids {
-                    let user_id = serenity::UserId::new(id.cast_unsigned());
+                        let display_name = guild_id.member(http, user_id).await.map_or_else(
+                            |_| format!("Unknown User ({id})"),
+                            |member| member.display_name().to_owned(),
+                        );
 
-                    // fetch the member object from Discord to get their server nickname
-                    let display_name = guild_id.member(&http, user_id).await.map_or_else(
-                        |_| format!("Unknown User ({id})"),
-                        |member| member.display_name().to_owned(),
-                    );
-
-                    let _ = writeln!(log_content, "{display_name}");
+                        let _ = writeln!(log_content, "{display_name}");
+                    }
                 }
             }
 
@@ -345,10 +382,24 @@ pub async fn close_and_finalize_poll(
 
         let _ = write!(log_content, "```");
 
-        let _ = log_channel
-            .send_message(&http, serenity::CreateMessage::new().content(log_content))
-            .await;
+        // truncate to 2000 chars if vote list grew too long
+        if log_content.len() > 1950 {
+            log_content.truncate(1900);
+            log_content.push_str("\n... [truncated due to discord message limit]\n```");
+        }
+
+        if let Err(e) = log_channel
+            .send_message(http, serenity::CreateMessage::new().content(log_content))
+            .await
+        {
+            error!(
+                error = ?e,
+                log_channel_id = log_channel.get(),
+                "failed to send poll closing audit log to channel"
+            );
+        }
     }
 
+    info!("poll successfully finalised and closed");
     Ok(())
 }
