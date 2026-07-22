@@ -19,9 +19,3 @@ pub struct NewPollModal {
     #[placeholder = "Maybe:1, Pizza:1, Tacos:1"]
     pub opt_bulk: Option<String>,
 }
-
-pub fn parse_weight(input: Option<String>) -> f64 {
-    input
-        .and_then(|s| s.replace(',', ".").parse::<f64>().ok())
-        .unwrap_or(1.0)
-}

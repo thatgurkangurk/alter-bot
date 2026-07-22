@@ -1,5 +1,5 @@
 use crate::{
-    features::polls::{CreatePollParams, create_and_post_poll},
+    features::polls::{CreatePollParams, PollChoice, create_and_post_poll},
     models::poll,
     web::AppState,
 };
@@ -8,19 +8,13 @@ use poise::serenity_prelude::{ChannelId, GuildId, RoleId};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct OptionInput {
-    pub name: String,
-    pub weight: Option<f64>,
-}
-
-#[derive(Deserialize)]
 pub struct CreatePollRequest {
     pub title: String,
     pub guild_id: String,
     pub channel_id: String,
     pub duration_minutes: i64,
     pub required_role_id: Option<String>,
-    pub options: Vec<OptionInput>,
+    pub choices: Vec<PollChoice>,
 }
 
 use serde::Serialize;
@@ -55,7 +49,7 @@ pub async fn create_poll_handler(
     State(state): State<AppState>,
     Json(payload): Json<CreatePollRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    if payload.options.len() < 2 {
+    if payload.choices.len() < 2 {
         return Err((
             StatusCode::BAD_REQUEST,
             "at least two poll options are required".to_string(),
@@ -89,25 +83,13 @@ pub async fn create_poll_handler(
         _ => None,
     };
 
-    let formatted_options: Vec<Option<String>> = payload
-        .options
-        .into_iter()
-        .map(|opt| {
-            let formatted = match opt.weight {
-                Some(weight) => format!("{}:{}", opt.name, weight),
-                None => opt.name,
-            };
-            Some(formatted)
-        })
-        .collect();
-
     let params = CreatePollParams {
         title: payload.title,
         guild_id: GuildId::new(guild_id_u64),
         target_channel_id: ChannelId::new(channel_id_u64),
         duration_minutes: payload.duration_minutes,
         required_role_id,
-        raw_inputs: formatted_options,
+        choices: payload.choices,
     };
 
     let poll = create_and_post_poll(&state.db, &state.http, params)

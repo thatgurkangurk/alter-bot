@@ -11,7 +11,7 @@ use std::sync::Arc;
 pub use cache::PollCache;
 pub use commands::poll_commands as commands;
 pub use events::event_handler;
-pub use internal::logic::{CreatePollParams, create_and_post_poll};
+pub use internal::logic::{CreatePollParams, PollChoice, create_and_post_poll};
 
 pub fn spawn_background_tasks(
     http: Arc<serenity::Http>,

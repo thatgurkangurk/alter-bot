@@ -4,7 +4,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use super::internal::renderer::generate_results_chart;
 use crate::bot::{Context, Data, Error};
-use crate::features::polls::internal::logic::{CreatePollParams, create_and_post_poll};
+use crate::features::polls::internal::logic::{CreatePollParams, PollChoice, create_and_post_poll};
 use crate::features::polls::modal::NewPollModal;
 use crate::models::{poll, poll_option, vote};
 
@@ -181,6 +181,11 @@ async fn start_poll(
         raw_inputs.extend(bulk.split(',').map(|s| Some(s.trim().to_string())));
     }
 
+    let choices: Vec<PollChoice> = raw_inputs
+        .into_iter()
+        .filter_map(|opt| opt?.parse().ok())
+        .collect();
+
     let poll = create_and_post_poll(
         &ctx.data().db,
         ctx.http(),
@@ -190,7 +195,7 @@ async fn start_poll(
             target_channel_id: target_channel.id,
             duration_minutes,
             required_role_id,
-            raw_inputs,
+            choices,
         },
     )
     .await?;

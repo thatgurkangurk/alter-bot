@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::str::FromStr;
 
 use anyhow::{Context, Result, anyhow};
 use chrono::{Duration, Utc};
 use poise::serenity_prelude as serenity;
 use sea_orm::{ActiveModelTrait, QueryFilter, Set, entity::prelude::*};
+use serde::Deserialize;
 
 use super::renderer::generate_results_chart;
 use crate::bot::Error;
@@ -14,13 +16,64 @@ use crate::models::{guild, poll, poll_option, vote};
 
 use tracing::{error, info, instrument};
 
+#[derive(Deserialize)]
+pub struct PollChoice {
+    pub text: String,
+    pub weight: Option<f64>,
+}
+
+#[allow(dead_code)]
+impl PollChoice {
+    pub fn new(text: impl Into<String>, weight: Option<f64>) -> Self {
+        Self {
+            text: text.into(),
+            weight,
+        }
+    }
+
+    /// parses a raw weight string (handling commas like "1,5" -> 1.5)
+    pub fn parse_weight(input: Option<&str>) -> f64 {
+        input
+            .and_then(|s| s.trim().replace(',', ".").parse::<f64>().ok())
+            .unwrap_or(1.0)
+    }
+
+    /// returns the parsed weight or defaults to 1.0
+    pub fn weight_or_default(&self) -> f64 {
+        self.weight.unwrap_or(1.0)
+    }
+}
+
+impl FromStr for PollChoice {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            return Err(());
+        }
+
+        // split on the first colon (supports colons inside option labels)
+        let mut parts = trimmed.splitn(2, ':');
+        let text = parts.next().unwrap_or("").trim().to_string();
+
+        if text.is_empty() {
+            return Err(());
+        }
+
+        let weight = parts.next().map(|w| Self::parse_weight(Some(w)));
+
+        Ok(Self { text, weight })
+    }
+}
+
 pub struct CreatePollParams {
     pub title: String,
     pub guild_id: serenity::GuildId,
     pub target_channel_id: serenity::ChannelId,
     pub duration_minutes: i64,
     pub required_role_id: Option<serenity::RoleId>,
-    pub raw_inputs: Vec<Option<String>>,
+    pub choices: Vec<PollChoice>,
 }
 
 /// creates a new poll and sends a message in the discord channel
@@ -39,8 +92,6 @@ pub async fn create_and_post_poll(
     http: impl serenity::CacheHttp,
     params: CreatePollParams,
 ) -> Result<poll::Model> {
-    use super::super::modal::parse_weight;
-
     let ends_at = Utc::now() + Duration::minutes(params.duration_minutes);
     let poll_id = Uuid::new_v4();
 
@@ -50,16 +101,13 @@ pub async fn create_and_post_poll(
     let mut buttons = Vec::new();
     let mut labels = Vec::new();
 
-    for (index, raw) in params.raw_inputs.into_iter().flatten().enumerate() {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
+    for (index, choice) in params.choices.into_iter().enumerate() {
+        let label = choice.text.trim().to_string();
+        if label.is_empty() {
             continue;
         }
 
-        let parts: Vec<&str> = trimmed.split(':').collect();
-        let label = parts[0].trim().to_string();
-        let weight_opt = parts.get(1).map(|s| s.trim().to_string());
-        let weight = parse_weight(weight_opt);
+        let weight = choice.weight.unwrap_or(1.0);
 
         let index_u32 = u32::try_from(index).unwrap_or(0);
         let emoji = char::from_u32(0x1F1E6 + index_u32);
