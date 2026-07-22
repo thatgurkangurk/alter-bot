@@ -60,6 +60,8 @@ pub async fn create_bot(config_manager: &ConfigManager) -> anyhow::Result<Client
 
     let db = create_db(config_manager).await?;
 
+    let config = config_manager.get().await;
+
     let commands = vec![info(), features::awty::are_we_there_yet()];
 
     let commands = features::polls::commands(commands);
@@ -68,6 +70,8 @@ pub async fn create_bot(config_manager: &ConfigManager) -> anyhow::Result<Client
     let commands = features::quote::commands(commands);
 
     let poll_cache = PollCache::new();
+    let is_dev = cfg!(debug_assertions);
+    let dev_guild_id = config.bot.dev_guild_id;
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -94,7 +98,28 @@ pub async fn create_bot(config_manager: &ConfigManager) -> anyhow::Result<Client
                 let cache_for_data = poll_cache_setup.clone();
 
                 Box::pin(async move {
-                    poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                    match (is_dev, dev_guild_id) {
+                        (true, Some(guild_id)) => {
+                            poise::builtins::register_in_guild(
+                                ctx,
+                                &framework.options().commands,
+                                guild_id,
+                            )
+                            .await?;
+                            info!("dev mode: registered commands in dev guild ({guild_id:?})");
+                        }
+                        (true, None) => {
+                            tracing::warn!("dev mode active, but `dev_guild_id` is missing in config! skipping guild registration");
+                        }
+                        (false, _) => {
+                            poise::builtins::register_globally(
+                                ctx,
+                                &framework.options().commands,
+                            )
+                            .await?;
+                            info!("registered commands globally");
+                        }
+                    }
 
                     features::polls::spawn_background_tasks(http_clone, db_clone, cache_for_tasks);
 
@@ -107,7 +132,7 @@ pub async fn create_bot(config_manager: &ConfigManager) -> anyhow::Result<Client
         })
         .build();
 
-    let client = serenity::ClientBuilder::new(&config_manager.get().await.bot.token, intents)
+    let client = serenity::ClientBuilder::new(config.bot.token, intents)
         .framework(framework)
         .await
         .map_err(|e| anyhow::anyhow!("failed to create client: {e}"))?;
@@ -123,10 +148,7 @@ pub async fn create_bot(config_manager: &ConfigManager) -> anyhow::Result<Client
         .config_manager(config_manager.clone())
         .poll_cache(poll_cache)
         .db(db)
-        .bind(SocketAddr::from((
-            host,
-            config_manager.get().await.web.port.unwrap_or(3000),
-        )))
+        .bind(SocketAddr::from((host, config.web.port.unwrap_or(3000))))
         .build()?
         .run();
 

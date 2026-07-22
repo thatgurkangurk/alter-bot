@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
+use serenity::model::id::GuildId;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -32,6 +33,7 @@ impl AsRef<str> for DiscordToken {
 #[derive(Debug, Clone, Deserialize)]
 pub struct BotConfig {
     pub token: DiscordToken,
+    pub dev_guild_id: Option<GuildId>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
