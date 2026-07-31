@@ -31,6 +31,7 @@ ab_glyph = "0.2.32"
 axum = "0.8.9"
 notify = "8.2.0"
 dashmap = "6.2.1"
+awty = { git = "https://github.com/thatgurkangurk/are-we-there-yet", package = "are-we-there-yet-core", tag = "v0.7.1" }
 
 
 # --- Global Lint Rules ---

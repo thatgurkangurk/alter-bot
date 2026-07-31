@@ -1,7 +1,9 @@
+use awty::{check_packwiz_pack, create_ferinth};
 use poise::serenity_prelude::{
     self as serenity, CreateInteractionResponse, CreateInteractionResponseMessage,
     EditInteractionResponse,
 };
+use reqwest::Client;
 use url::Url;
 
 use crate::bot::Error;
@@ -43,11 +45,21 @@ pub async fn handle_persistent_buttons(
         press.defer(ctx).await?;
 
         if let Ok(url) = Url::parse(url_str) {
-            let client = reqwest::Client::new();
+            let client = Client::new();
+            let ferinth = create_ferinth();
 
-            if let Ok(updated_embed) =
-                super::packwiz::check_packwiz_status(&client, &url, version, add_percentage).await
+            if let Ok(report) = check_packwiz_pack(
+                &client,
+                &ferinth,
+                &url,
+                version,
+                None,
+                None::<fn(&str, usize, usize)>,
+            )
+            .await
             {
+                let updated_embed = super::embed::create_awty_embed(&report, add_percentage);
+
                 press
                     .edit_response(ctx, EditInteractionResponse::new().embed(updated_embed))
                     .await?;

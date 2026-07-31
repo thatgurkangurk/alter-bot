@@ -2,8 +2,8 @@ use poise::serenity_prelude::{ButtonStyle, CreateActionRow, CreateButton};
 use reqwest::Client;
 use url::Url;
 
-use super::internal as awty;
 use crate::bot::{Context, Error};
+use awty::{check_packwiz_pack, create_ferinth};
 
 #[poise::command(slash_command, rename = "are-we-there-yet")]
 /// a command to get update status for a packwiz modpack (MODRINTH ONLY!)
@@ -15,9 +15,19 @@ pub async fn are_we_there_yet(
 ) -> Result<(), Error> {
     ctx.defer().await?;
     let client = Client::new();
+    let ferinth = create_ferinth();
     let include_pct = add_percentage.unwrap_or(false);
 
-    let embed = awty::packwiz::check_packwiz_status(&client, &url, &version, include_pct).await?;
+    let report = check_packwiz_pack(
+        &client,
+        &ferinth,
+        &url,
+        &version,
+        None,
+        None::<fn(&str, usize, usize)>,
+    )
+    .await?;
+    let embed = super::internal::embed::create_awty_embed(&report, include_pct);
 
     // encode state into custom_id: prefix|author_id|percentage_flag|version|url
     let custom_id = format!(
