@@ -22,13 +22,17 @@ pub async fn event_handler(
     data: &Data,
 ) -> Result<(), Error> {
     if let serenity::FullEvent::ReactionAdd { add_reaction } = event {
-        let config = data.config_manager.get().await;
-        let bot_id = ctx.cache.current_user().id;
+        let (Some(user_id), Some(author_id)) =
+            (add_reaction.user_id, add_reaction.message_author_id)
+        else {
+            return Ok(());
+        };
 
-        if add_reaction.user_id == Some(bot_id) && is_blocked_emoji(&add_reaction.emoji) {
+        if user_id == author_id && is_blocked_emoji(&add_reaction.emoji) {
+            let config = data.config_manager.get().await;
             let message = add_reaction.message(&ctx.http).await?;
 
-            if message.author.id == bot_id {
+            if message.author.id == author_id {
                 let role_id = config
                     .misc
                     .as_ref()
