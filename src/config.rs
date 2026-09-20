@@ -38,7 +38,8 @@ pub struct BotConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct MiscConfig {
-    pub can_react_true_to_own_messages_role: Option<RoleId>,
+    pub self_reaction_roles: Option<Vec<RoleId>>,
+    pub invert_self_reaction_roles: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
