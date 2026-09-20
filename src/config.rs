@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
-use serenity::model::id::GuildId;
+use serenity::model::id::{GuildId, RoleId};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -37,6 +37,11 @@ pub struct BotConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct MiscConfig {
+    pub can_react_true_to_own_messages_role: Option<RoleId>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct WebConfig {
     pub tokens: Vec<String>,
     pub port: Option<u16>,
@@ -52,6 +57,7 @@ pub struct Config {
     pub bot: BotConfig,
     pub db: DatabaseConfig,
     pub web: WebConfig,
+    pub misc: Option<MiscConfig>,
 }
 
 #[derive(Clone)]

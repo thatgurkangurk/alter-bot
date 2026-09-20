@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
 
     config_manager.watch()?;
 
-    let mut bot = create_bot(&config_manager).await?;
+    let mut bot = create_bot(config_manager).await?;
 
     if let Err(why) = bot.start().await {
         tracing::error!("bot crashed: {:?}", why);
