@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "crates/alterbot",
-    "crates/entry"
+    "crates/entry",
+    "crates/quoter"
 ]
 resolver = "3"
 default-members = ["crates/entry"]
@@ -11,6 +12,8 @@ anyhow = "1.0.104"
 tokio = "1.53.1"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
+reqwest = "0.13.4"
+thiserror = "2.0.20"
 
 [workspace.package]
 version = "0.1.0"

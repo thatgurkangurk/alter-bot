@@ -1,6 +1,5 @@
 use crate::bot::{Context, Error};
 use ::serenity::all::{CreateAttachment, User};
-use image::EncodableLayout;
 use poise::{CreateReply, serenity_prelude as serenity};
 use tracing::error;
 
@@ -26,29 +25,29 @@ async fn quote(
 
     ctx.defer().await?;
 
-    let image = match super::image::generate_quote_image(
+    let image = match quoter::create_quote_image(
         &avatar_url,
         &content,
         &format!("- {}", user.display_name()),
         &create_username(&user),
+        quoter::ImageFormat::Png,
     )
     .await
     {
         Ok(img) => img,
-        Err(e) => {
-            error!("Failed to generate quote image: {e:?}");
-            ctx.say("uh oh something went wrong").await?;
+        Err(err) => {
+            let msg = match err.downcast_ref::<quoter::QuoterError>() {
+                Some(quoter_err) => quoter_err.to_string(),
+                None => "an unexpected error occurred while generating the quote image".to_string(),
+            };
+
+            error!("failed to generate quote image: {err:?}");
+            ctx.say(msg).await?;
             return Ok(());
         }
     };
 
-    let mut bytes: Vec<u8> = Vec::new();
-    image::DynamicImage::ImageRgba8(image).write_to(
-        &mut std::io::Cursor::new(&mut bytes),
-        image::ImageFormat::Png,
-    )?;
-
-    let attachment = CreateAttachment::bytes(bytes.as_bytes(), "quote.png");
+    let attachment = CreateAttachment::bytes(image, "quote.png");
 
     let message_builder = CreateReply::default().attachment(attachment);
 

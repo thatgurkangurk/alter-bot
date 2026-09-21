@@ -1,7 +1,9 @@
 use ab_glyph::{FontRef, PxScale};
+use anyhow::anyhow;
 use image::{Rgba, RgbaImage, imageops::FilterType};
 use imageproc::drawing::{draw_text_mut, text_size};
 use std::error::Error;
+use thiserror::Error;
 
 const FONT_BYTES: &[u8] = include_bytes!("./space-grotesk-semibold.ttf");
 
@@ -17,7 +19,7 @@ fn scale_channel(value: u8, factor: f32) -> u8 {
     clippy::cast_possible_wrap,
     clippy::cast_possible_truncation
 )]
-pub async fn generate_quote_image(
+async fn generate_quote_bytes(
     profile_picture_url: &str,
     quote_text: &str,
     username: &str,
@@ -159,4 +161,32 @@ pub async fn generate_quote_image(
     );
 
     Ok(canvas)
+}
+
+#[derive(Error, Debug)]
+pub enum QuoterError {
+    #[error("failed to generate quote image: {0}")]
+    FailedToGenerate(String),
+}
+
+pub async fn create_quote_image(
+    profile_picture_url: &str,
+    quote_text: &str,
+    username: &str,
+    handle: &str,
+    output_format: crate::ImageFormat,
+) -> anyhow::Result<Vec<u8>> {
+    let image = match generate_quote_bytes(profile_picture_url, quote_text, username, handle).await
+    {
+        Ok(img) => img,
+        Err(e) => {
+            return Err(anyhow!(QuoterError::FailedToGenerate(e.to_string())));
+        }
+    };
+
+    let mut bytes: Vec<u8> = Vec::new();
+    image::DynamicImage::ImageRgba8(image)
+        .write_to(&mut std::io::Cursor::new(&mut bytes), output_format)?;
+
+    Ok(bytes)
 }
