@@ -1,44 +1,29 @@
-[package]
-name = "alter-bot"
+[workspace]
+members = [
+    "crates/alterbot",
+    "crates/entry"
+]
+resolver = "3"
+default-members = ["crates/entry"]
+
+[workspace.dependencies]
+anyhow = "1.0.104"
+tokio = "1.53.1"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/thatgurkangurk/alter-bot"
 license = "MPL-2.0"
 authors = ["gurkan"]
 
-[dependencies]
-anyhow = "1.0.104"
-config = { version = "0.15.25", default-features = false, features = ["toml"] }
-poise = "0.6.2"
-serde = { version = "1.0.229", features = ["derive"] }
-serenity = "0.12.5"
-tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread"] }
-tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.23", features = ["chrono", "env-filter"] }
-sea-orm = { version = "^2.0.0", features = ["runtime-tokio-rustls", "entity-registry", "schema-sync", "sqlx-postgres"] }
-uuid = { version = "1.24.0", features = ["v4"] }
-chrono = "0.4.45"
-craftping = { version = "0.7.0", features = ["async-tokio"] }
-serde_json = "1.0.151"
-ferinth = "2.13.1"
-reqwest = "0.13.4"
-url = "2.5.8"
-toml = "1.1.3"
-futures = "0.3.33"
-image = "0.25.10"
-imageproc = "0.27.0"
-ab_glyph = "0.2.32"
-axum = "0.8.9"
-notify = "8.2.0"
-dashmap = "6.2.1"
-awty = { git = "https://github.com/thatgurkangurk/are-we-there-yet", package = "are-we-there-yet-core", tag = "v0.7.1" }
-
-
 # --- Global Lint Rules ---
-[lints.rust]
+[workspace.lints.rust]
 unsafe_code = "warn"
 
-[lints.clippy]
+[workspace.lints.clippy]
 # Set broad groups to a lower priority (-1) so exceptions can override them
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }

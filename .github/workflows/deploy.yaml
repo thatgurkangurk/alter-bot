@@ -11,7 +11,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: "thatgurkangurk/alter-bot"
   CARGO_TERM_COLOR: always
-  BIN_NAME: alter-bot
+  BIN_NAME: entry
   MISE_EXPERIMENTAL: true
 
 concurrency:
@@ -55,9 +55,9 @@ jobs:
 
       - name: Build Release Binary (AMD64)
         run: |
-          cargo build --release
+          cargo build --release -p entry
           mkdir -p ./deploy-out/amd64
-          cp target/release/alter-bot ./deploy-out/amd64/
+          cp target/release/entry ./deploy-out/amd64/
         env:
           RUSTFLAGS: "-C linker=clang -C link-arg=-fuse-ld=mold"
           DATA_DIR: "/app/data"
@@ -66,9 +66,9 @@ jobs:
 
       - name: Build Release Binary (ARM64)
         run: |
-          cargo build --release --target aarch64-unknown-linux-gnu
+          cargo build --release -p entry --target aarch64-unknown-linux-gnu
           mkdir -p ./deploy-out/arm64
-          cp target/aarch64-unknown-linux-gnu/release/alter-bot ./deploy-out/arm64/
+          cp target/aarch64-unknown-linux-gnu/release/entry ./deploy-out/arm64/
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           DATA_DIR: "/app/data"
@@ -109,6 +109,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             APP_VERSION=${{ steps.bin_version.outputs.VERSION }}
+            BIN_NAME=${{ env.BIN_NAME }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           file: Dockerfile.actions

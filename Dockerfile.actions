@@ -21,8 +21,8 @@ RUN groupadd -g ${GID} alter && \
 
 RUN mkdir -p /app/data && chown alter:alter /app/data
 
-COPY ./deploy-out/${TARGETARCH}/alter-bot /usr/local/bin/alter-bot
+COPY ./deploy-out/${TARGETARCH}/entry /usr/local/bin/entry
 
 USER alter
 
-ENTRYPOINT ["/usr/local/bin/alter-bot"]
+ENTRYPOINT ["/usr/local/bin/entry"]
