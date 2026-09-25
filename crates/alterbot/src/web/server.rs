@@ -9,6 +9,11 @@ use sea_orm::DatabaseConnection;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{error, info};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{Http, HttpAuthScheme, SecurityScheme},
+};
+use utoipa_scalar::{Scalar, Servable};
 
 use super::routes::{polls::create_poll_handler, send_message_handler, status_handler};
 use crate::{
@@ -16,9 +21,40 @@ use crate::{
     features::polls::PollCache,
     web::{
         middleware::require_bearer_auth,
-        routes::guilds::{list_guild_channels, list_guilds},
+        routes::{
+            MessageResponse,
+            guilds::{ChannelResponse, GuildResponse, list_guild_channels, list_guilds},
+        },
     },
 };
+
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "bearer_auth",
+                SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),
+            );
+        }
+    }
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        crate::web::routes::guilds::list_guilds,
+        crate::web::routes::guilds::list_guild_channels,
+        crate::web::routes::send_message_handler
+    ),
+    components(schemas(GuildResponse, ChannelResponse, MessageResponse,)),
+    modifiers(&SecurityAddon),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+pub struct ApiDoc;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -132,7 +168,7 @@ impl WebServer {
         let addr = self.addr;
 
         let protected_routes = Router::new()
-            .route("/api/send-message", post(send_message_handler))
+            .route("/api/messages", post(send_message_handler))
             .route("/api/polls", post(create_poll_handler))
             .route("/api/guilds", get(list_guilds))
             .route("/api/guilds/{guild_id}/channels", get(list_guild_channels))
@@ -141,6 +177,7 @@ impl WebServer {
         let app = Router::new()
             .route("/status", get(status_handler))
             .merge(protected_routes)
+            .merge(Scalar::with_url("/docs", ApiDoc::openapi()))
             .with_state(self.state);
 
         tokio::spawn(async move {

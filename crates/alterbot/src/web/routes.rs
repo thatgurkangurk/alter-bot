@@ -1,23 +1,28 @@
+use crate::web::{AppResult, AppState};
 use ::serenity::model::id::{ChannelId, MessageId};
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Json, extract::State};
 use poise::serenity_prelude as serenity;
 use serde::{Deserialize, Serialize};
-
-use super::AppState;
+use utoipa::ToSchema;
 
 pub(super) mod guilds;
 pub(super) mod polls;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct StatusResponse {
     pub status: &'static str,
     pub active_shards: usize,
     pub version: &'static str,
 }
 
-pub async fn status_handler(
-    State(state): State<AppState>,
-) -> Result<Json<StatusResponse>, StatusCode> {
+#[utoipa::path(
+    get,
+    path = "/status",
+    responses(
+        (status = 200, description = "Bot operational status", body = StatusResponse)
+    )
+)]
+pub async fn status_handler(State(state): State<AppState>) -> AppResult<Json<StatusResponse>> {
     let active_shards = {
         let runners = state.shard_manager.runners.lock().await;
         runners.len()
@@ -38,54 +43,63 @@ pub async fn status_handler(
     }))
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct MessageRequest {
     pub channel_id: String,
     pub message: String,
     pub reply_to_id: Option<String>,
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MessageResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/messages",
+    request_body = MessageRequest,
+    responses(
+        (status = 200, description = "message sent successfully", body = MessageResponse),
+        (status = 400, description = "invalid channel or reply id format"),
+        (status = 500, description = "discord api error")
+    )
+)]
 pub async fn send_message_handler(
     State(state): State<AppState>,
     Json(body): Json<MessageRequest>,
-) -> impl IntoResponse {
-    let channel_id: ChannelId = match body.channel_id.parse::<u64>() {
-        Ok(id) => ChannelId::new(id),
-        Err(_) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                "Invalid channel_id format".to_string(),
-            );
-        }
-    };
+) -> AppResult<Json<MessageResponse>> {
+    let channel_id = body
+        .channel_id
+        .parse::<u64>()
+        .map(ChannelId::new)
+        .map_err(|_| crate::web::error::AppError::NotFound("Invalid channel_id format".into()))?;
 
     let http = &state.http;
 
-    let result = if let Some(reply_id_str) = body.reply_to_id {
-        if let Ok(reply_id) = reply_id_str.parse::<u64>() {
-            channel_id
-                .send_message(
-                    http,
-                    serenity::builder::CreateMessage::new()
-                        .content(body.message)
-                        .reference_message((channel_id, MessageId::new(reply_id))),
-                )
-                .await
-        } else {
-            return (
-                StatusCode::BAD_REQUEST,
-                "Invalid reply_to_id format".to_string(),
-            );
-        }
-    } else {
-        channel_id.say(http, body.message).await
-    };
+    if let Some(reply_id_str) = body.reply_to_id {
+        let reply_id = reply_id_str
+            .parse::<u64>()
+            .map(MessageId::new)
+            .map_err(|_| {
+                crate::web::error::AppError::NotFound("Invalid reply_to_id format".into())
+            })?;
 
-    match result {
-        Ok(_) => (StatusCode::OK, "Success".to_string()),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Discord Error: {e}"),
-        ),
+        channel_id
+            .send_message(
+                http,
+                serenity::builder::CreateMessage::new()
+                    .content(body.message)
+                    .reference_message((channel_id, reply_id)),
+            )
+            .await?;
+    } else {
+        channel_id.say(http, body.message).await?;
     }
+
+    Ok(Json(MessageResponse {
+        success: true,
+        message: "Message dispatched successfully".to_string(),
+    }))
 }

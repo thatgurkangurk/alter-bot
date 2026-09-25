@@ -7,8 +7,9 @@ use serde::Serialize;
 use serenity::model::channel::GuildChannel;
 use serenity::model::guild::GuildInfo;
 use serenity::model::id::GuildId;
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct GuildResponse {
     pub id: String,
     pub name: String,
@@ -25,6 +26,14 @@ impl From<GuildInfo> for GuildResponse {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/guilds",
+    responses(
+        (status = 200, description = "list of current bot guilds", body = Vec<GuildResponse>),
+        (status = 500, description = "failed to retrieve guilds from discord")
+    )
+)]
 pub async fn list_guilds(State(state): State<AppState>) -> AppResult<Json<Vec<GuildResponse>>> {
     let guilds = state.http.get_guilds(None, None).await?;
 
@@ -33,7 +42,7 @@ pub async fn list_guilds(State(state): State<AppState>) -> AppResult<Json<Vec<Gu
     Ok(Json(response))
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ChannelResponse {
     pub id: String,
     pub name: String,
@@ -54,6 +63,17 @@ impl From<GuildChannel> for ChannelResponse {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/guilds/{guild_id}/channels",
+    params(
+        ("guild_id" = String, Path, description = "discord guild id")
+    ),
+    responses(
+        (status = 200, description = "list of channels in the specified guild", body = Vec<ChannelResponse>),
+        (status = 500, description = "failed to retrieve channels from discord")
+    )
+)]
 pub async fn list_guild_channels(
     State(state): State<AppState>,
     Path(guild_id): Path<GuildId>,
