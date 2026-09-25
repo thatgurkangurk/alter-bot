@@ -12,7 +12,12 @@ use tracing::{error, info};
 
 use super::routes::{polls::create_poll_handler, send_message_handler, status_handler};
 use crate::{
-    config::ConfigManager, features::polls::PollCache, web::middleware::require_bearer_auth,
+    config::ConfigManager,
+    features::polls::PollCache,
+    web::{
+        middleware::require_bearer_auth,
+        routes::guilds::{list_guild_channels, list_guilds},
+    },
 };
 
 #[derive(Clone)]
@@ -129,6 +134,8 @@ impl WebServer {
         let protected_routes = Router::new()
             .route("/api/send-message", post(send_message_handler))
             .route("/api/polls", post(create_poll_handler))
+            .route("/api/guilds", get(list_guilds))
+            .route("/api/guilds/{guild_id}/channels", get(list_guild_channels))
             .route_layer(from_fn_with_state(self.state.clone(), require_bearer_auth));
 
         let app = Router::new()

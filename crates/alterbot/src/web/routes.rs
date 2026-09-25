@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AppState;
 
+pub(super) mod guilds;
 pub(super) mod polls;
 
 #[derive(Serialize)]
