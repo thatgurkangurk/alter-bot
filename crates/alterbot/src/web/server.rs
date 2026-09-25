@@ -5,9 +5,11 @@ use axum::{
     routing::{get, post},
 };
 use poise::serenity_prelude as serenity;
+use reqwest::{Method, header};
 use sea_orm::DatabaseConnection;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
 use utoipa::{
     Modify, OpenApi,
@@ -167,6 +169,17 @@ impl WebServer {
     pub fn run(self) {
         let addr = self.addr;
 
+        let cors = CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::DELETE,
+                Method::OPTIONS,
+            ])
+            .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT]);
+
         let protected_routes = Router::new()
             .route("/api/messages", post(send_message_handler))
             .route("/api/polls", post(create_poll_handler))
@@ -178,6 +191,7 @@ impl WebServer {
             .route("/status", get(status_handler))
             .merge(protected_routes)
             .merge(Scalar::with_url("/docs", ApiDoc::openapi()))
+            .layer(cors)
             .with_state(self.state);
 
         tokio::spawn(async move {

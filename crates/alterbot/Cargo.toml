@@ -32,3 +32,4 @@ quoter = { path = "../quoter" }
 thiserror.workspace = true
 utoipa = "6.0.0"
 utoipa-scalar = { version = "0.4.0", features = ["axum"] }
+tower-http = { version = "0.7.1", features = ["cors"] }
