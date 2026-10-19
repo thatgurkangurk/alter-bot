@@ -1,5 +1,5 @@
 [package]
-name = "alterbot"
+name = "serenity-alterbot"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -33,3 +33,7 @@ thiserror.workspace = true
 utoipa = "6.0.0"
 utoipa-scalar = { version = "0.4.0", features = ["axum"] }
 tower-http = { version = "0.7.1", features = ["cors"] }
+twilight-gateway = "0.17"
+twilight-http = "0.17"
+twilight-model = "0.17"
+twilight-util = { version = "0.17", features = ["builder"] }

@@ -10,4 +10,4 @@ anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
-alterbot = { path = "../alterbot" }
+serenity-alterbot = { path = "../serenity_alterbot" }
