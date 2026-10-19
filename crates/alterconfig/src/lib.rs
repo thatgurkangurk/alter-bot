@@ -1,13 +1,14 @@
 use anyhow::{Context, Result};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
-use serenity::model::id::{GuildId, RoleId};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
-use crate::util::validate_token;
+mod util;
+
+use util::validate_token;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(try_from = "String")]
@@ -33,12 +34,12 @@ impl AsRef<str> for DiscordToken {
 #[derive(Debug, Clone, Deserialize)]
 pub struct BotConfig {
     pub token: DiscordToken,
-    pub dev_guild_id: Option<GuildId>,
+    pub dev_guild_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct MiscConfig {
-    pub self_reaction_roles: Option<Vec<RoleId>>,
+    pub self_reaction_roles: Option<Vec<u64>>,
     pub invert_self_reaction_roles: Option<bool>,
 }
 

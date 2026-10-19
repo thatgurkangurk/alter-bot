@@ -19,7 +19,6 @@ use utoipa_scalar::{Scalar, Servable};
 
 use super::routes::{polls::create_poll_handler, send_message_handler, status_handler};
 use crate::{
-    config::ConfigManager,
     features::polls::PollCache,
     web::{
         middleware::require_bearer_auth,
@@ -29,6 +28,7 @@ use crate::{
         },
     },
 };
+use alterconfig::ConfigManager;
 
 struct SecurityAddon;
 

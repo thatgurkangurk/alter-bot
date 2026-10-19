@@ -104,6 +104,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "alterconfig"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "config",
+ "notify",
+ "serde",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1182,6 +1195,7 @@ dependencies = [
 name = "entry"
 version = "0.1.0"
 dependencies = [
+ "alterconfig",
  "anyhow",
  "serenity-alterbot",
  "tokio",
@@ -4013,6 +4027,7 @@ dependencies = [
 name = "serenity-alterbot"
 version = "0.1.0"
 dependencies = [
+ "alterconfig",
  "anyhow",
  "are-we-there-yet-core",
  "axum",

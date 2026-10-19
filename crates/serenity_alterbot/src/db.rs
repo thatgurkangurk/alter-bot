@@ -1,4 +1,4 @@
-use crate::config::ConfigManager;
+use alterconfig::ConfigManager;
 use sea_orm::{ConnectionTrait, Database, DatabaseConnection};
 use tracing::info;
 

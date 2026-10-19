@@ -3,11 +3,11 @@ use std::path::Path;
 use tracing::{info, warn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-use crate::{bot::create_bot, config::ConfigManager};
+use crate::bot::create_bot;
+use alterconfig::ConfigManager;
 use anyhow::Result;
 
 mod bot;
-mod config;
 mod consts;
 mod db;
 mod features;

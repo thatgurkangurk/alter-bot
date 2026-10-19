@@ -1,5 +1,4 @@
 pub mod bot;
-pub mod config;
 pub mod consts;
 mod db;
 mod features;

@@ -42,10 +42,12 @@ pub async fn event_handler(
     let allowed_roles = misc.self_reaction_roles.as_deref().unwrap_or(&[]);
     let is_blacklist_mode = misc.invert_self_reaction_roles.unwrap_or(false);
 
-    let has_matching_role = add_reaction
-        .member
-        .as_ref()
-        .is_some_and(|member| member.roles.iter().any(|r| allowed_roles.contains(r)));
+    let has_matching_role = add_reaction.member.as_ref().is_some_and(|member| {
+        member
+            .roles
+            .iter()
+            .any(|r| allowed_roles.contains(&r.get()))
+    });
 
     let is_allowed = has_matching_role ^ is_blacklist_mode;
 

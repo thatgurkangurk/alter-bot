@@ -2,8 +2,9 @@ use std::path::Path;
 
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
+use alterconfig::ConfigManager;
 use anyhow::Result;
-use serenity_alterbot::{bot::create_bot, config::ConfigManager, consts};
+use serenity_alterbot::{bot::create_bot, consts};
 
 macro_rules! info { ($($arg:tt)*) => { tracing::info!(target: "serenity_alterbot::main", $($arg)*) }; }
 macro_rules! warn { ($($arg:tt)*) => { tracing::warn!(target: "serenity_alterbot::main", $($arg)*) }; }

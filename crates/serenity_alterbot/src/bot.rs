@@ -1,18 +1,20 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use ::serenity::model::id::GuildId;
 use poise::{CreateReply, serenity_prelude as serenity};
 use sea_orm::DatabaseConnection;
 use serenity::Client;
 use tracing::{info, warn};
 
 use crate::{
-    config::ConfigManager,
     consts,
     db::create_db,
     features::{self, polls::PollCache},
     web::WebServer,
 };
+
+use alterconfig::ConfigManager;
 
 pub struct Data {
     pub db: DatabaseConnection,
@@ -106,7 +108,7 @@ pub async fn create_bot(config_manager: ConfigManager) -> anyhow::Result<Client>
                         poise::builtins::register_in_guild(
                             ctx,
                             &framework.options().commands,
-                            guild_id,
+                            GuildId::new(guild_id),
                         )
                         .await?;
                         info!("dev mode: registered commands in dev guild ({guild_id:?})");
