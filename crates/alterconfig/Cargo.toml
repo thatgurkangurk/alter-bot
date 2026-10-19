@@ -13,3 +13,4 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 notify = "8.2.0"
 config = { version = "0.15.25", default-features = false, features = ["toml"] }
 serde = { version = "1.0.229", features = ["derive"] }
+arc-swap = "1.9.3"

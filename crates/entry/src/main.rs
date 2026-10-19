@@ -2,13 +2,14 @@ use std::path::Path;
 
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
+use alterbot::{consts, start_bot};
 use alterconfig::ConfigManager;
 use anyhow::Result;
-use serenity_alterbot::{bot::create_bot, consts};
 
-macro_rules! info { ($($arg:tt)*) => { tracing::info!(target: "serenity_alterbot::main", $($arg)*) }; }
-macro_rules! warn { ($($arg:tt)*) => { tracing::warn!(target: "serenity_alterbot::main", $($arg)*) }; }
-macro_rules! error { ($($arg:tt)*) => { tracing::error!(target: "serenity_alterbot::main", $($arg)*) }; }
+macro_rules! info { ($($arg:tt)*) => { tracing::info!(target: "alterbot::main", $($arg)*) }; }
+macro_rules! warn { ($($arg:tt)*) => { tracing::warn!(target: "alterbot::main", $($arg)*) }; }
+#[allow(unused)]
+macro_rules! error { ($($arg:tt)*) => { tracing::error!(target: "alterbot::main", $($arg)*) }; }
 
 fn print_startup_info() {
     info!("==========================================");
@@ -41,10 +42,13 @@ fn load_config_manager() -> Result<ConfigManager> {
     ConfigManager::new(Some(&default_path))
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("warn,serenity_alterbot=info"));
+fn main() -> anyhow::Result<()> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls ring crypto provider");
+
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,alterbot=debug"));
 
     let timer = fmt::time::ChronoLocal::new("%Y-%m-%d %H:%M:%S".to_string());
 
@@ -59,11 +63,9 @@ async fn main() -> anyhow::Result<()> {
 
     config_manager.watch()?;
 
-    let mut bot = create_bot(config_manager).await?;
+    let config = config_manager.get_sync();
 
-    if let Err(why) = bot.start().await {
-        error!("bot crashed: {:?}", why);
-    }
+    start_bot(&config)?;
 
     Ok(())
 }

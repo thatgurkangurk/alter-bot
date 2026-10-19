@@ -11,4 +11,6 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 serenity-alterbot = { path = "../serenity_alterbot" }
+alterbot = { path = "../alterbot" }
 alterconfig = { path = "../alterconfig" }
+rustls = { default-features = false, version = "0.23.46", features = ["ring"] }

@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
+use arc_swap::ArcSwap;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::sync::{Arc, mpsc};
+use std::thread;
 use tracing::{error, info, warn};
 
 mod util;
@@ -64,7 +65,7 @@ pub struct Config {
 
 #[derive(Clone)]
 pub struct ConfigManager {
-    inner: Arc<RwLock<Config>>,
+    inner: Arc<ArcSwap<Config>>,
     path: Option<PathBuf>,
 }
 
@@ -89,24 +90,30 @@ impl ConfigManager {
         let config = Config::load(path)?;
 
         Ok(Self {
-            inner: Arc::new(RwLock::new(config)),
+            inner: Arc::new(ArcSwap::from_pointee(config)),
             path: path.map(Path::to_path_buf),
         })
     }
 
-    pub async fn get(&self) -> Config {
-        self.inner.read().await.clone()
+    pub fn get_ref(&self) -> Arc<Config> {
+        self.inner.load_full()
     }
 
-    pub async fn reload(&self) -> Result<()> {
+    pub fn get_sync(&self) -> Config {
+        (**self.inner.load()).clone()
+    }
+
+    pub async fn get(&self) -> Config {
+        self.get_sync()
+    }
+
+    pub fn reload_sync(&self) -> Result<()> {
         let new_config = Config::load(self.path.as_deref())?;
-
-        {
-            let mut writer = self.inner.write().await;
-            *writer = new_config;
-        }
-
+        self.inner.store(Arc::new(new_config));
         Ok(())
+    }
+    pub async fn reload(&self) -> Result<()> {
+        self.reload_sync()
     }
 
     pub fn watch(&self) -> anyhow::Result<()> {
@@ -115,7 +122,7 @@ impl ConfigManager {
             return Ok(());
         };
 
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, rx) = mpsc::channel();
 
         let mut watcher = RecommendedWatcher::new(
             move |res: Result<Event, notify::Error>| {
@@ -129,14 +136,14 @@ impl ConfigManager {
         watcher.watch(path, RecursiveMode::NonRecursive)?;
 
         let manager = self.clone();
-        tokio::spawn(async move {
+        thread::spawn(move || {
             let _watcher = watcher;
 
-            while let Some(event) = rx.recv().await {
+            while let Ok(event) = rx.recv() {
                 if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
                     info!("config file update detected. reloading...");
 
-                    if let Err(err) = manager.reload().await {
+                    if let Err(err) = manager.reload_sync() {
                         error!("auto-reload failed: {:#}", err);
                     } else {
                         info!("config reloaded successfully.");

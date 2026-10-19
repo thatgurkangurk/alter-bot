@@ -3,7 +3,8 @@ members = [
     "crates/serenity_alterbot",
     "crates/entry",
     "crates/quoter",
-    "crates/alterconfig"
+    "crates/alterconfig",
+    "crates/alterbot"
 ]
 resolver = "3"
 default-members = ["crates/entry"]
