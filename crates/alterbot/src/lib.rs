@@ -6,7 +6,7 @@ mod module_manager;
 mod resume;
 mod util;
 
-use crate::module_manager::MANAGER;
+use crate::{module_manager::MANAGER, util::get_bot_user};
 
 pub use self::{
     context::CTX,
@@ -96,6 +96,30 @@ async fn event_handler(event: Event, _state: ()) {
     }
 
     match event {
+        Event::Ready(ready) => {
+            let name: String = ready
+                .user
+                .global_name
+                .clone()
+                .unwrap_or_else(|| ready.user.name.clone());
+
+            tracing::info!(name = %name, "logged in successfully")
+        }
+
+        Event::Resumed => {
+            let bot_user = get_bot_user().await;
+
+            let bot_name = match &bot_user {
+                Ok(user) => user.global_name.as_deref().unwrap_or(&user.name),
+                Err(err) => {
+                    tracing::warn!(error = %err, "failed to fetch bot user");
+                    "unknown"
+                }
+            };
+
+            tracing::info!(name = %bot_name, "resumed session successfully");
+        }
+
         Event::InteractionCreate(interaction) => {
             let span = tracing::info_span!("interaction", id = %interaction.id);
             log_err(MANAGER.handle_interaction(interaction).instrument(span)).await;
