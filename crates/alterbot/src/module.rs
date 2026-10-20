@@ -1,6 +1,7 @@
 pub mod fun;
 pub mod misc;
 pub mod ping;
+pub mod quote;
 
 use std::pin::Pin;
 

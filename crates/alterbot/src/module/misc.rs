@@ -1,7 +1,7 @@
 use crate::{
     consts,
     module::{CommandScope, Module, ModuleCommand, ModuleEntry},
-    util::{get_bot_user, rgb_to_packed_u32},
+    util::{get_avatar_url, get_bot_user, rgb_to_packed_u32},
 };
 use anyhow::Context;
 use twilight_model::{
@@ -38,16 +38,7 @@ pub async fn run(
     let timestamp =
         Timestamp::from_secs(chrono::Utc::now().timestamp()).context("valid timestamp")?;
 
-    let avatar_url = match &bot_user.avatar {
-        Some(hash) => format!(
-            "https://cdn.discordapp.com/avatars/{}/{}.webp",
-            bot_user.id, hash
-        ),
-        None => {
-            let default_index = (bot_user.id.get() >> 22) % 5;
-            format!("https://cdn.discordapp.com/embed/avatars/{default_index}.webp")
-        }
-    };
+    let avatar_url = get_avatar_url(bot_user.avatar, bot_user.id);
 
     let embed = EmbedBuilder::new()
         .title("alter bot")

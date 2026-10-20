@@ -1,6 +1,10 @@
 use crate::CTX;
 use anyhow::Context;
-use twilight_model::user::CurrentUser;
+use twilight_model::{
+    id::{Id, marker::UserMarker},
+    user::CurrentUser,
+    util::ImageHash,
+};
 
 #[must_use]
 pub fn sanitise_pings(message: &str) -> String {
@@ -26,4 +30,19 @@ pub async fn get_bot_user() -> anyhow::Result<CurrentUser> {
         .await?;
 
     Ok(user)
+}
+
+#[must_use]
+/// returns a webp url
+pub fn get_avatar_url(image_hash: Option<ImageHash>, user_id: Id<UserMarker>) -> String {
+    match image_hash {
+        Some(hash) => format!(
+            "https://cdn.discordapp.com/avatars/{}/{}.webp",
+            user_id, hash
+        ),
+        None => {
+            let default_index = (user_id.get() >> 22) % 5;
+            format!("https://cdn.discordapp.com/embed/avatars/{default_index}.webp")
+        }
+    }
 }
