@@ -1,4 +1,5 @@
 use crate::ShardHandle;
+use alterconfig::ConfigManager;
 use dashmap::DashMap;
 use std::{ops::Deref, sync::OnceLock};
 use twilight_cache_inmemory::{InMemoryCache, InMemoryCacheBuilder};
@@ -13,6 +14,7 @@ pub struct Context {
     pub http: Client,
     pub shards: DashMap<u32, ShardHandle>,
     pub cache: InMemoryCache,
+    pub config_manager: ConfigManager,
 }
 
 impl Context {
@@ -21,12 +23,18 @@ impl Context {
     }
 }
 
-pub fn init(application_id: Id<ApplicationMarker>, http: Client, shards: u32) {
+pub fn init(
+    application_id: Id<ApplicationMarker>,
+    http: Client,
+    shards: u32,
+    config_manager: ConfigManager,
+) {
     let context = Context {
         application_id,
         http,
         shards: DashMap::with_capacity(shards as usize),
         cache: InMemoryCacheBuilder::new().build(),
+        config_manager,
     };
     assert!(CTX.0.set(context).is_ok());
 }

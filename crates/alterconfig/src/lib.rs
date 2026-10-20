@@ -63,7 +63,7 @@ pub struct Config {
     pub misc: Option<MiscConfig>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ConfigManager {
     inner: Arc<ArcSwap<Config>>,
     path: Option<PathBuf>,

@@ -24,12 +24,14 @@ use twilight_gateway::{
 };
 use twilight_http::Client;
 
-use alterconfig::Config;
+use alterconfig::ConfigManager;
 
 const EVENT_TYPES: EventTypeFlags = EventTypeFlags::all();
 const INTENTS: Intents = Intents::all();
 
-pub fn start_bot(config: &Config) -> anyhow::Result<()> {
+pub fn start_bot(config_manager: ConfigManager) -> anyhow::Result<()> {
+    let config = config_manager.get_sync();
+
     let rt = RuntimeBuilder::new_current_thread().enable_all().build()?;
     let _guard = rt.enter();
 
@@ -55,7 +57,7 @@ pub fn start_bot(config: &Config) -> anyhow::Result<()> {
 
     let shards = resume::restore(bot_config, info.shards);
 
-    context::init(app.id, http, shards.len() as u32);
+    context::init(app.id, http, shards.len() as u32, config_manager);
 
     let resume_info = rt.block_on(event_loop(shards))?;
 

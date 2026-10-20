@@ -1,10 +1,26 @@
 use crate::module::{Module, ModuleEntry};
 use anyhow::Context;
-use twilight_model::gateway::event::Event;
+use twilight_http::request::channel::reaction::RequestReactionType;
+use twilight_model::{
+    channel::message::EmojiReactionType,
+    gateway::event::Event,
+    id::{Id, marker::EmojiMarker},
+};
 
 pub struct FunModule;
 
 pub const NAME: &str = "fun";
+
+const BLOCKED_CUSTOM_EMOJI_IDS: &[Id<EmojiMarker>] =
+    &[Id::new(1494754728582709338), Id::new(1500871782477856969)];
+const BLOCKED_UNICODE_EMOJIS: &[&str] = &["✅", "❌"];
+
+fn is_blocked_emoji(emoji: &EmojiReactionType) -> bool {
+    match emoji {
+        EmojiReactionType::Unicode { name } => BLOCKED_UNICODE_EMOJIS.contains(&name.as_str()),
+        EmojiReactionType::Custom { id, .. } => BLOCKED_CUSTOM_EMOJI_IDS.contains(id),
+    }
+}
 
 const IM_TRIGGERS: &[&str] = &["im", "i'm", "i’m", "i am"];
 const DELIMITERS: &[char] = &['.', ',', '\n', '!', '?'];
@@ -75,35 +91,91 @@ impl Module for FunModule {
     }
 
     async fn handle_event(&self, event: &Event) -> anyhow::Result<()> {
-        if let Event::MessageCreate(msg) = event {
-            if msg.author.bot {
-                return Ok(());
+        match event {
+            Event::MessageCreate(msg) => {
+                if msg.author.bot {
+                    return Ok(());
+                }
+
+                let Some(name) = get_dad_joke_name(&msg.content) else {
+                    return Ok(());
+                };
+
+                let current_user = crate::CTX
+                    .cache
+                    .current_user()
+                    .context("current user missing from cache")?;
+
+                let bot_name = current_user
+                    .global_name
+                    .as_deref()
+                    .unwrap_or(&current_user.name);
+
+                let name = crate::util::sanitise_pings(&name);
+
+                let content = format!("Hi {}, I'm {}!", name, bot_name);
+
+                crate::CTX
+                    .http
+                    .create_message(msg.channel_id)
+                    .content(&content)
+                    .reply(msg.id)
+                    .await?;
             }
 
-            let Some(name) = get_dad_joke_name(&msg.content) else {
-                return Ok(());
-            };
+            Event::ReactionAdd(reaction) => {
+                let Some(author_id) = reaction.message_author_id else {
+                    return Ok(());
+                };
 
-            let current_user = crate::CTX
-                .cache
-                .current_user()
-                .context("current user missing from cache")?;
+                if reaction.user_id != author_id || !is_blocked_emoji(&reaction.emoji) {
+                    return Ok(());
+                }
 
-            let bot_name = current_user
-                .global_name
-                .as_deref()
-                .unwrap_or(&current_user.name);
+                let request_emoji = match &reaction.emoji {
+                    EmojiReactionType::Custom { id, name, .. } => RequestReactionType::Custom {
+                        id: *id,
+                        name: name.as_deref(),
+                    },
+                    EmojiReactionType::Unicode { name } => RequestReactionType::Unicode { name },
+                };
 
-            let name = crate::util::sanitise_pings(&name);
+                let delete_reaction = async {
+                    crate::CTX
+                        .http
+                        .delete_reaction(
+                            reaction.channel_id,
+                            reaction.message_id,
+                            &request_emoji,
+                            reaction.user_id,
+                        )
+                        .await
+                };
 
-            let content = format!("Hi {}, I'm {}!", name, bot_name);
+                let config = crate::CTX.config_manager.get_sync();
+                let Some(misc) = &config.misc else {
+                    delete_reaction.await?;
+                    return Ok(());
+                };
 
-            crate::CTX
-                .http
-                .create_message(msg.channel_id)
-                .content(&content)
-                .reply(msg.id)
-                .await?;
+                let allowed_roles = misc.self_reaction_roles.as_deref().unwrap_or(&[]);
+                let is_blacklist_mode = misc.invert_self_reaction_roles.unwrap_or(false);
+
+                let has_matching_role = reaction.member.as_ref().is_some_and(|member| {
+                    member
+                        .roles
+                        .iter()
+                        .any(|r| allowed_roles.contains(&r.get()))
+                });
+
+                let is_allowed = has_matching_role ^ is_blacklist_mode;
+
+                if !is_allowed {
+                    delete_reaction.await?;
+                }
+            }
+
+            _ => {}
         }
 
         Ok(())

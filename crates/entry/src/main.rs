@@ -63,9 +63,7 @@ fn main() -> anyhow::Result<()> {
 
     config_manager.watch()?;
 
-    let config = config_manager.get_sync();
-
-    start_bot(&config)?;
+    start_bot(config_manager)?;
 
     Ok(())
 }
