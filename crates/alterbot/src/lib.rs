@@ -4,6 +4,7 @@ mod dispatch;
 mod module;
 mod module_manager;
 mod resume;
+mod util;
 
 use crate::module_manager::MANAGER;
 
@@ -84,6 +85,8 @@ async fn event_loop(shards: impl Iterator<Item = Shard>) -> anyhow::Result<Box<[
 }
 
 async fn event_handler(event: Event, _state: ()) {
+    CTX.cache.update(&event);
+
     async fn log_err(future: Instrumented<impl Future<Output = anyhow::Result<()>>>) {
         let mut future = pin!(future);
         if let Err(error) = future.as_mut().await {

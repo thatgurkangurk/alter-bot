@@ -1,6 +1,7 @@
 use crate::ShardHandle;
 use dashmap::DashMap;
 use std::{ops::Deref, sync::OnceLock};
+use twilight_cache_inmemory::{InMemoryCache, InMemoryCacheBuilder};
 use twilight_http::{Client, client::InteractionClient};
 use twilight_model::id::{Id, marker::ApplicationMarker};
 
@@ -11,6 +12,7 @@ pub struct Context {
     pub application_id: Id<ApplicationMarker>,
     pub http: Client,
     pub shards: DashMap<u32, ShardHandle>,
+    pub cache: InMemoryCache,
 }
 
 impl Context {
@@ -24,6 +26,7 @@ pub fn init(application_id: Id<ApplicationMarker>, http: Client, shards: u32) {
         application_id,
         http,
         shards: DashMap::with_capacity(shards as usize),
+        cache: InMemoryCacheBuilder::new().build(),
     };
     assert!(CTX.0.set(context).is_ok());
 }

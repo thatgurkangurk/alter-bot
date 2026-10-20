@@ -131,6 +131,7 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
+ "twilight-cache-inmemory",
  "twilight-gateway",
  "twilight-http",
  "twilight-model",
@@ -5113,6 +5114,18 @@ dependencies = [
  "thiserror 1.0.69",
  "url",
  "utf-8",
+]
+
+[[package]]
+name = "twilight-cache-inmemory"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d205ec8d1fc62db874cc7af787cc5919a6d8513974159de950764917c563f30"
+dependencies = [
+ "bitflags",
+ "dashmap 6.2.1",
+ "serde",
+ "twilight-model",
 ]
 
 [[package]]
