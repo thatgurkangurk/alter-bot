@@ -54,20 +54,18 @@ impl ModuleManager {
     }
 
     pub async fn register_commands(&self) -> anyhow::Result<()> {
+        let interaction = crate::CTX.interaction();
+
         let globals: Vec<_> = self
             .global_commands
             .values()
             .map(|c| (c.builder)())
             .collect();
-        crate::CTX
-            .interaction()
-            .set_global_commands(&globals)
-            .await?;
+        interaction.set_global_commands(&globals).await?;
 
         for (&guild_id, commands) in &self.guild_commands {
             let guild_cmds: Vec<_> = commands.values().map(|c| (c.builder)()).collect();
-            crate::CTX
-                .interaction()
+            interaction
                 .set_guild_commands(guild_id, &guild_cmds)
                 .await?;
         }

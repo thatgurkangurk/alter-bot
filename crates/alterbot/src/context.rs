@@ -1,8 +1,8 @@
-use crate::ShardHandle;
+use crate::cache::Cache;
 use alterconfig::ConfigManager;
-use dashmap::DashMap;
+use sea_orm::DatabaseConnection;
 use std::{ops::Deref, sync::OnceLock};
-use twilight_cache_inmemory::{InMemoryCache, InMemoryCacheBuilder};
+use twilight_cache_inmemory::ResourceType;
 use twilight_http::{Client, client::InteractionClient};
 use twilight_model::id::{Id, marker::ApplicationMarker};
 
@@ -12,9 +12,9 @@ pub static CTX: Ref = Ref(OnceLock::new());
 pub struct Context {
     pub application_id: Id<ApplicationMarker>,
     pub http: Client,
-    pub shards: DashMap<u32, ShardHandle>,
-    pub cache: InMemoryCache,
+    pub cache: Cache,
     pub config_manager: ConfigManager,
+    pub database: DatabaseConnection,
 }
 
 impl Context {
@@ -26,15 +26,24 @@ impl Context {
 pub fn init(
     application_id: Id<ApplicationMarker>,
     http: Client,
-    shards: u32,
     config_manager: ConfigManager,
+    database: DatabaseConnection,
 ) {
     let context = Context {
         application_id,
         http,
-        shards: DashMap::with_capacity(shards as usize),
-        cache: InMemoryCacheBuilder::new().build(),
+        cache: crate::cache::Cache::builder()
+            .resource_types(
+                ResourceType::GUILD
+                    | ResourceType::MEMBER
+                    | ResourceType::USER
+                    | ResourceType::CHANNEL
+                    | ResourceType::ROLE
+                    | ResourceType::USER_CURRENT,
+            )
+            .build(),
         config_manager,
+        database,
     };
     assert!(CTX.0.set(context).is_ok());
 }

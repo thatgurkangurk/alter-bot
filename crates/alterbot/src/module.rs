@@ -1,7 +1,9 @@
 pub mod fun;
+pub mod guild;
 pub mod misc;
 pub mod ping;
 pub mod quote;
+pub mod welcome;
 
 use std::pin::Pin;
 

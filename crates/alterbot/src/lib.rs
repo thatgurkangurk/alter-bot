@@ -1,96 +1,129 @@
+mod cache;
 pub mod consts;
 mod context;
-mod dispatch;
+mod entity;
 mod module;
 mod module_manager;
-mod resume;
 mod util;
 
-use crate::{module_manager::MANAGER, util::get_bot_user};
-
-pub use self::{
-    context::CTX,
-    dispatch::{ShardHandle, ShardRestartKind},
-    resume::{ConfigBuilderExt, Info as ResumeInfo},
-};
+use crate::module_manager::MANAGER;
+pub use context::CTX;
 
 use anyhow::Context as _;
-use std::{convert::identity, pin::pin, time::Duration};
+use sea_orm::Database;
 use tokio::{runtime::Builder as RuntimeBuilder, signal};
-use tokio_stream::StreamExt as _;
 use tracing::{Instrument as _, instrument::Instrumented};
 use twilight_gateway::{
-    ConfigBuilder, Event, EventTypeFlags, Intents, Shard, queue::InMemoryQueue,
+    ConfigBuilder, Event, EventTypeFlags, Intents, Shard, StreamExt, create_recommended,
 };
-use twilight_http::Client;
+use twilight_http::Client as HttpClient;
 
 use alterconfig::ConfigManager;
 
 const EVENT_TYPES: EventTypeFlags = EventTypeFlags::all();
 const INTENTS: Intents = Intents::all();
 
-pub fn start_bot(config_manager: ConfigManager) -> anyhow::Result<()> {
+pub fn start_bot(
+    config_manager: ConfigManager,
+    sync_commands: bool,
+    exit_after_sync: bool,
+) -> anyhow::Result<()> {
     let config = config_manager.get_sync();
 
-    let rt = RuntimeBuilder::new_current_thread().enable_all().build()?;
-    let _guard = rt.enter();
+    let rt = RuntimeBuilder::new_multi_thread().enable_all().build()?;
 
-    let http = Client::new(config.bot.token.as_ref().to_string());
+    rt.block_on(async move {
+        let http = HttpClient::builder()
+            .token(config.bot.token.as_ref().to_string())
+            .build();
 
-    let app = rt
-        .block_on(async { anyhow::Ok(http.current_user_application().await?.model().await?) })
-        .context("getting app")?;
-    let info = rt
-        .block_on(async { anyhow::Ok(http.gateway().authed().await?.model().await?) })
-        .context("getting info")?;
+        let (user, app) = tokio::try_join!(
+            async {
+                http.current_user()
+                    .await?
+                    .model()
+                    .await
+                    .map_err(anyhow::Error::from)
+            },
+            async {
+                http.current_user_application()
+                    .await?
+                    .model()
+                    .await
+                    .map_err(anyhow::Error::from)
+            },
+        )?;
 
-    let queue = InMemoryQueue::new(
-        info.session_start_limit.max_concurrency,
-        info.session_start_limit.remaining,
-        Duration::from_millis(info.session_start_limit.reset_after),
-        info.session_start_limit.total,
-    );
+        tracing::info!(user = %user.name, "logged in successfully");
 
-    let bot_config = ConfigBuilder::new(config.bot.token.as_ref().to_string(), INTENTS)
-        .queue(queue)
-        .build();
+        tracing::info!("connecting to db...");
+        let db = Database::connect(&config.db.uri).await?;
 
-    let shards = resume::restore(bot_config, info.shards);
+        let crate_name = module_path!().split("::").next().unwrap();
+        let pattern = format!("{crate_name}::entity::*");
 
-    context::init(app.id, http, shards.len() as u32, config_manager);
+        tracing::info!("syncing all db schema using pattern {}", pattern);
+        db.get_schema_registry(&pattern).sync(&db).await?;
+        tracing::info!("db schema successfully synced");
 
-    let resume_info = rt.block_on(event_loop(shards))?;
+        let gateway_config =
+            ConfigBuilder::new(config.bot.token.as_ref().to_string(), INTENTS).build();
 
-    resume::save(&resume_info).context("saving resume info")?;
+        let shards =
+            create_recommended(&http, gateway_config, |_, builder| builder.build()).await?;
 
-    Ok(())
+        context::init(app.id, http, config_manager, db);
+
+        if sync_commands {
+            tracing::info!("syncing application commands...");
+            MANAGER
+                .register_commands()
+                .await
+                .context("registering commands")?;
+            tracing::info!("application commands successfully synced");
+        }
+
+        if exit_after_sync {
+            tracing::info!("exit requested after sync operations; exiting");
+            return anyhow::Ok(());
+        }
+
+        let runners: Vec<_> = shards
+            .into_iter()
+            .map(|shard| tokio::spawn(run_shard(shard)))
+            .collect();
+
+        signal::ctrl_c().await?;
+        tracing::info!("shutting down; press CTRL-C to abort");
+
+        for runner in runners {
+            runner.abort();
+        }
+
+        anyhow::Ok(())
+    })
 }
 
-async fn event_loop(shards: impl Iterator<Item = Shard>) -> anyhow::Result<Box<[ResumeInfo]>> {
-    MANAGER
-        .register_commands()
-        .await
-        .context("registering commands")?;
+async fn run_shard(mut shard: Shard) {
+    while let Some(event) = shard.next_event(EVENT_TYPES).await {
+        match event {
+            Ok(event) => {
+                CTX.cache.update(&event);
 
-    let tasks = shards
-        .map(|shard| tokio::spawn(dispatch::run(event_handler, shard, |_shard| ())))
-        .collect::<Box<_>>();
-
-    signal::ctrl_c().await?;
-    tracing::info!("shutting down; press CTRL-C to abort");
-
-    let results = tokio_stream::iter(tasks).then(identity);
-    tokio::select! {
-        _ = signal::ctrl_c() => Ok(Box::default()),
-        resume_info = results.collect::<Result<_, _>>() => anyhow::Ok(resume_info?),
+                tokio::spawn(async move {
+                    event_handler(event).await;
+                });
+            }
+            Err(error) => {
+                tracing::warn!(shard = %shard.id(), %error, "Error receiving gateway event");
+            }
+        }
     }
 }
 
-async fn event_handler(event: Event, _state: ()) {
-    CTX.cache.update(&event);
-
-    async fn log_err(future: Instrumented<impl Future<Output = anyhow::Result<()>>>) {
-        let mut future = pin!(future);
+async fn event_handler(event: Event) {
+    async fn log_err(future: Instrumented<impl std::future::Future<Output = anyhow::Result<()>>>) {
+        let mut future = std::pin::pin!(future);
         if let Err(error) = future.as_mut().await {
             let _enter = future.span().enter();
             tracing::warn!(error = &*error, "failed to handle event");
@@ -105,21 +138,7 @@ async fn event_handler(event: Event, _state: ()) {
                 .clone()
                 .unwrap_or_else(|| ready.user.name.clone());
 
-            tracing::info!(name = %name, "logged in successfully")
-        }
-
-        Event::Resumed => {
-            let bot_user = get_bot_user().await;
-
-            let bot_name = match &bot_user {
-                Ok(user) => user.global_name.as_deref().unwrap_or(&user.name),
-                Err(err) => {
-                    tracing::warn!(error = %err, "failed to fetch bot user");
-                    "unknown"
-                }
-            };
-
-            tracing::info!(name = %bot_name, "resumed session successfully");
+            tracing::info!(name = %name, "shard ready");
         }
 
         Event::InteractionCreate(interaction) => {
