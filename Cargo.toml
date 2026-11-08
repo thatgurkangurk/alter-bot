@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "crates/serenity_alterbot",
     "crates/entry",
     "crates/quoter",
     "crates/alterconfig",
