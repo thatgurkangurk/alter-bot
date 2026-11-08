@@ -2,19 +2,22 @@ use std::path::Path;
 
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-use alterbot::{bot::create_bot, config::ConfigManager, consts};
+use alterbot::{consts, start_bot};
+use alterconfig::ConfigManager;
 use anyhow::Result;
 
+#[allow(unused)]
 macro_rules! info { ($($arg:tt)*) => { tracing::info!(target: "alterbot::main", $($arg)*) }; }
 macro_rules! warn { ($($arg:tt)*) => { tracing::warn!(target: "alterbot::main", $($arg)*) }; }
+#[allow(unused)]
 macro_rules! error { ($($arg:tt)*) => { tracing::error!(target: "alterbot::main", $($arg)*) }; }
 
 fn print_startup_info() {
-    info!("==========================================");
-    info!("alter-bot version {} by gurkan", consts::VERSION);
-    info!("MPL 2.0 license");
-    info!("{}", &consts::REPOSITORY);
-    info!("==========================================");
+    println!("==========================================");
+    println!("alter-bot version {} by gurkan", consts::VERSION);
+    println!("MPL 2.0 license");
+    println!("{}", consts::REPOSITORY);
+    println!("==========================================");
 }
 
 fn load_config_manager() -> Result<ConfigManager> {
@@ -40,10 +43,13 @@ fn load_config_manager() -> Result<ConfigManager> {
     ConfigManager::new(Some(&default_path))
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls ring crypto provider");
+
     let filter =
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,alterbot=info"));
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn,alterbot=debug,twilight_gateway::shard=off,twilight_http_ratelimiting::in_memory=info"));
 
     let timer = fmt::time::ChronoLocal::new("%Y-%m-%d %H:%M:%S".to_string());
 
@@ -54,15 +60,14 @@ async fn main() -> anyhow::Result<()> {
 
     print_startup_info();
 
+    let sync_commands = std::env::args().nth(1).as_deref() == Some("sync");
+    let exit_after_sync = sync_commands && cfg!(debug_assertions);
+
     let config_manager = load_config_manager()?;
 
     config_manager.watch()?;
 
-    let mut bot = create_bot(config_manager).await?;
-
-    if let Err(why) = bot.start().await {
-        error!("bot crashed: {:?}", why);
-    }
+    start_bot(config_manager, sync_commands, exit_after_sync)?;
 
     Ok(())
 }

@@ -26,3 +26,4 @@ COPY ./deploy-out/${TARGETARCH}/entry /usr/local/bin/entry
 USER alter
 
 ENTRYPOINT ["/usr/local/bin/entry"]
+CMD ["sync"]
