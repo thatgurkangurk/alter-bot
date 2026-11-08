@@ -13,9 +13,7 @@ use anyhow::Context as _;
 use sea_orm::Database;
 use tokio::{runtime::Builder as RuntimeBuilder, signal};
 use tracing::{Instrument as _, instrument::Instrumented};
-use twilight_gateway::{
-    ConfigBuilder, Event, EventTypeFlags, Intents, Shard, StreamExt, create_recommended,
-};
+use twilight_gateway::{ConfigBuilder, Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt};
 use twilight_http::Client as HttpClient;
 
 use alterconfig::ConfigManager;
@@ -69,8 +67,8 @@ pub fn start_bot(
         let gateway_config =
             ConfigBuilder::new(config.bot.token.as_ref().to_string(), INTENTS).build();
 
-        let shards =
-            create_recommended(&http, gateway_config, |_, builder| builder.build()).await?;
+        let gateway_info = http.gateway().authed().await?.model().await?;
+        let total_shards = gateway_info.shards;
 
         context::init(app.id, http, config_manager, db);
 
@@ -88,9 +86,14 @@ pub fn start_bot(
             return anyhow::Ok(());
         }
 
-        let runners: Vec<_> = shards
-            .into_iter()
-            .map(|shard| tokio::spawn(run_shard(shard)))
+        let runners: Vec<_> = (0..total_shards)
+            .map(|shard_index| {
+                let shard_id = ShardId::new(shard_index, total_shards);
+
+                let shard = Shard::with_config(shard_id, gateway_config.clone());
+
+                tokio::spawn(run_shard(shard))
+            })
             .collect();
 
         signal::ctrl_c().await?;

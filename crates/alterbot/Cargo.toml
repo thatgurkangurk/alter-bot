@@ -27,11 +27,11 @@ dashmap = "6.2.1"
 quoter = { path = "../quoter" }
 alterconfig = { path = "../alterconfig" }
 thiserror.workspace = true
-twilight-gateway = "0.17"
-twilight-http = "0.17"
-twilight-model = "0.17"
-twilight-util = { version = "0.17", features = ["builder"] }
-twilight-cache-inmemory = "0.17.1"
+twilight-gateway = "0.18"
+twilight-http = "0.18"
+twilight-model = "0.18"
+twilight-util = { version = "0.18", features = ["builder"] }
+twilight-cache-inmemory = "0.18"
 either = "1.19.0"
 arc-swap = "1.9.3"
 inventory = "0.3.25"
