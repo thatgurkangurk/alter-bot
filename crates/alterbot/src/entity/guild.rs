@@ -9,15 +9,10 @@ pub struct Model {
     pub id: i64,
 
     pub welcome_channel_id: Option<i64>,
+    pub poll_log_channel_id: Option<i64>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}
-
-// impl Model {
-//     pub fn discord_id(&self) -> Id<GuildMarker> {
-//         Id::new(self.id as u64)
-//     }
-// }
 
 impl Entity {
     pub async fn get_or_initialise(
@@ -34,7 +29,7 @@ impl Entity {
         Entity::insert(active_model)
             .on_conflict(
                 OnConflict::column(Column::Id)
-                    .update_column(Column::Id) // dummy update to trigger RETURNING in postgres
+                    .update_column(Column::Id) // dummy update forces postgres to touch the row
                     .to_owned(),
             )
             .exec_with_returning(db)

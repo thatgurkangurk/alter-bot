@@ -36,6 +36,8 @@ fn settings_permissions() -> Permissions {
 pub enum SetSettingsSubcommand {
     #[command(name = "welcome_channel")]
     WelcomeChannel(WelcomeChannelOptions),
+    #[command(name = "poll_log_channel")]
+    PollLogChannel(PollLogChannelOptions),
 }
 
 #[derive(CreateCommand, CommandModel)]
@@ -47,6 +49,19 @@ pub struct WelcomeChannelOptions {
     #[command(
         desc = "the channel to send welcome messages in",
         channel_types = "guild_text"
+    )]
+    pub channel: Id<ChannelMarker>,
+}
+
+#[derive(CreateCommand, CommandModel)]
+#[command(
+    name = "poll_log_channel",
+    desc = "set the channel or forum thread for poll logs"
+)]
+pub struct PollLogChannelOptions {
+    #[command(
+        desc = "the channel or forum thread to post poll logs in",
+        channel_types = "guild_text guild_announcement public_thread private_thread"
     )]
     pub channel: Id<ChannelMarker>,
 }
@@ -70,20 +85,35 @@ pub async fn run(interaction: Box<InteractionCreate>, data: Box<CommandData>) ->
     match command {
         SettingsCommand::Set(SetSettingsSubcommand::WelcomeChannel(options)) => {
             let channel_id = options.channel;
-
             let db_channel_id = channel_id.get() as i64;
 
             let db_guild =
                 entity::guild::Entity::get_or_initialise(&crate::CTX.database, guild_id).await?;
 
             let mut active_guild: entity::guild::ActiveModel = db_guild.into_active_model();
-
             active_guild.welcome_channel_id = Set(Some(db_channel_id));
             active_guild.update(&crate::CTX.database).await?;
 
             send_ephemeral_response(
                 &interaction,
                 &format!("welcome channel successfully updated to <#{channel_id}>."),
+            )
+            .await?;
+        }
+        SettingsCommand::Set(SetSettingsSubcommand::PollLogChannel(options)) => {
+            let channel_id = options.channel;
+            let db_channel_id = channel_id.get() as i64;
+
+            let db_guild =
+                entity::guild::Entity::get_or_initialise(&crate::CTX.database, guild_id).await?;
+
+            let mut active_guild: entity::guild::ActiveModel = db_guild.into_active_model();
+            active_guild.poll_log_channel_id = Set(Some(db_channel_id));
+            active_guild.update(&crate::CTX.database).await?;
+
+            send_ephemeral_response(
+                &interaction,
+                &format!("poll log channel successfully updated to <#{channel_id}>."),
             )
             .await?;
         }

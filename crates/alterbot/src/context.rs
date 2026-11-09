@@ -1,7 +1,10 @@
-use crate::cache::Cache;
+use crate::{cache::Cache, module::poll::PollManager};
 use alterconfig::ConfigManager;
 use sea_orm::DatabaseConnection;
-use std::{ops::Deref, sync::OnceLock};
+use std::{
+    ops::Deref,
+    sync::{Arc, OnceLock},
+};
 use twilight_cache_inmemory::ResourceType;
 use twilight_http::{Client, client::InteractionClient};
 use twilight_model::id::{Id, marker::ApplicationMarker};
@@ -15,6 +18,7 @@ pub struct Context {
     pub cache: Cache,
     pub config_manager: ConfigManager,
     pub database: DatabaseConnection,
+    pub poll_manager: Arc<PollManager>,
 }
 
 impl Context {
@@ -27,11 +31,13 @@ pub fn init(
     application_id: Id<ApplicationMarker>,
     http: Client,
     config_manager: ConfigManager,
-    database: DatabaseConnection,
+    database: &DatabaseConnection,
+    poll_manager: &Arc<PollManager>,
 ) {
     let context = Context {
         application_id,
         http,
+        poll_manager: Arc::clone(poll_manager),
         cache: crate::cache::Cache::builder()
             .resource_types(
                 ResourceType::GUILD
@@ -43,7 +49,7 @@ pub fn init(
             )
             .build(),
         config_manager,
-        database,
+        database: database.clone(),
     };
     assert!(CTX.0.set(context).is_ok());
 }

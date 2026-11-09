@@ -1,13 +1,16 @@
 mod cache;
 pub mod consts;
 mod context;
+mod emoji;
 mod entity;
 mod module;
 mod module_manager;
 mod util;
 mod web;
 
-use crate::module_manager::MANAGER;
+use std::sync::Arc;
+
+use crate::{module::poll::PollManager, module_manager::MANAGER};
 pub use context::CTX;
 
 use anyhow::Context as _;
@@ -71,7 +74,9 @@ pub fn start_bot(
         let gateway_info = http.gateway().authed().await?.model().await?;
         let total_shards = gateway_info.shards;
 
-        context::init(app.id, http, config_manager, db);
+        let poll_manager = Arc::new(PollManager::new(db.clone()));
+
+        context::init(app.id, http, config_manager, &db, &poll_manager);
 
         let web_addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));
         let web_handle = tokio::spawn(async move {
@@ -93,6 +98,9 @@ pub fn start_bot(
             tracing::info!("exit requested after sync operations; exiting");
             return anyhow::Ok(());
         }
+
+        poll_manager.start_tasks();
+        tracing::info!("poll expiration checker started");
 
         let mut runners: Vec<_> = (0..total_shards)
             .map(|shard_index| {
@@ -156,6 +164,11 @@ async fn event_handler(event: Event) {
 
         Event::InteractionCreate(interaction) => {
             let span = tracing::info_span!("interaction", id = %interaction.id);
+
+            MANAGER
+                .handle_event(&Event::InteractionCreate(interaction.clone()))
+                .await;
+
             log_err(MANAGER.handle_interaction(interaction).instrument(span)).await;
         }
 

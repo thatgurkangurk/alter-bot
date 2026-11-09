@@ -2,6 +2,7 @@ pub mod fun;
 pub mod guild;
 pub mod misc;
 pub mod ping;
+pub mod poll;
 pub mod quote;
 pub mod settings;
 pub mod welcome;
