@@ -1,28 +1,28 @@
-use crate::module::{CommandScope, Module, ModuleCommand, ModuleEntry};
+use anyhow::Result;
+use twilight_interactions::command::{CommandModel, CreateCommand};
 use twilight_model::{
-    application::{
-        command::{Command, CommandType},
-        interaction::application_command::CommandData,
-    },
+    application::{command::Command, interaction::application_command::CommandData},
     channel::message::MessageFlags,
     gateway::payload::incoming::InteractionCreate,
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
 };
-use twilight_util::builder::command::CommandBuilder;
+
+use crate::module::{CommandScope, Module, ModuleCommand, ModuleEntry};
 
 pub struct PingModule;
 
-pub const NAME: &str = "ping";
+#[derive(CreateCommand, CommandModel)]
+#[command(name = "ping", desc = "Ping the bot")]
+pub struct PingCommand;
 
 pub fn command() -> Command {
-    CommandBuilder::new(NAME, "Ping the bot", CommandType::ChatInput).build()
+    PingCommand::create_command().into()
 }
 
-pub async fn run(
-    interaction: Box<InteractionCreate>,
-    _data: Box<CommandData>,
-) -> anyhow::Result<()> {
-    let data = InteractionResponseData {
+pub async fn run(interaction: Box<InteractionCreate>, data: Box<CommandData>) -> Result<()> {
+    let _cmd = PingCommand::from_interaction((*data).into())?;
+
+    let response_data = InteractionResponseData {
         content: Some("Pong!".to_owned()),
         flags: Some(MessageFlags::EPHEMERAL),
         ..Default::default()
@@ -30,7 +30,7 @@ pub async fn run(
 
     let response = InteractionResponse {
         kind: InteractionResponseType::ChannelMessageWithSource,
-        data: Some(data),
+        data: Some(response_data),
     };
 
     crate::CTX
@@ -44,12 +44,12 @@ pub async fn run(
 #[async_trait::async_trait]
 impl Module for PingModule {
     fn name(&self) -> &'static str {
-        NAME
+        "ping"
     }
 
     fn commands(&self) -> Vec<ModuleCommand> {
         vec![ModuleCommand {
-            name: NAME,
+            name: "ping",
             scope: CommandScope::Global,
             builder: command,
             run: |i, d| Box::pin(run(i, d)),
