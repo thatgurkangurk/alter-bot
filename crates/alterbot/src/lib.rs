@@ -5,6 +5,7 @@ mod entity;
 mod module;
 mod module_manager;
 mod util;
+mod web;
 
 use crate::module_manager::MANAGER;
 pub use context::CTX;
@@ -72,6 +73,13 @@ pub fn start_bot(
 
         context::init(app.id, http, config_manager, db);
 
+        let web_addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));
+        let web_handle = tokio::spawn(async move {
+            if let Err(err) = web::run(web_addr).await {
+                tracing::error!(error = %err, "web server stopped unexpectedly");
+            }
+        });
+
         if sync_commands {
             tracing::info!("syncing application commands...");
             MANAGER
@@ -86,7 +94,7 @@ pub fn start_bot(
             return anyhow::Ok(());
         }
 
-        let runners: Vec<_> = (0..total_shards)
+        let mut runners: Vec<_> = (0..total_shards)
             .map(|shard_index| {
                 let shard_id = ShardId::new(shard_index, total_shards);
 
@@ -95,6 +103,8 @@ pub fn start_bot(
                 tokio::spawn(run_shard(shard))
             })
             .collect();
+
+        runners.push(web_handle);
 
         signal::ctrl_c().await?;
         tracing::info!("shutting down; press CTRL-C to abort");
