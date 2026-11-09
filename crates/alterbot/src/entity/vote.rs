@@ -11,7 +11,12 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub poll_message_id: i64,
 
-    #[sea_orm(belongs_to, from = "poll_message_id", to = "message_id")]
+    #[sea_orm(
+        belongs_to,
+        from = "poll_message_id",
+        to = "message_id",
+        on_delete = "Cascade"
+    )]
     pub poll: BelongsTo<super::poll::Entity>,
 
     #[sea_orm(primary_key, auto_increment = false)]
