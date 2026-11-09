@@ -15,7 +15,7 @@ pub use context::CTX;
 
 use anyhow::Context as _;
 use sea_orm::Database;
-use tokio::{runtime::Builder as RuntimeBuilder, signal};
+use tokio::signal;
 use tracing::{Instrument as _, instrument::Instrumented};
 use twilight_gateway::{ConfigBuilder, Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt};
 use twilight_http::Client as HttpClient;
@@ -25,104 +25,99 @@ use alterconfig::ConfigManager;
 const EVENT_TYPES: EventTypeFlags = EventTypeFlags::all();
 const INTENTS: Intents = Intents::all();
 
-pub fn start_bot(
+pub async fn start_bot(
     config_manager: ConfigManager,
     sync_commands: bool,
     exit_after_sync: bool,
 ) -> anyhow::Result<()> {
     let config = config_manager.get_sync();
 
-    let rt = RuntimeBuilder::new_multi_thread().enable_all().build()?;
+    let http = HttpClient::builder()
+        .token(config.bot.token.as_ref().to_string())
+        .build();
 
-    rt.block_on(async move {
-        let http = HttpClient::builder()
-            .token(config.bot.token.as_ref().to_string())
-            .build();
-
-        let (user, app) = tokio::try_join!(
-            async {
-                http.current_user()
-                    .await?
-                    .model()
-                    .await
-                    .map_err(anyhow::Error::from)
-            },
-            async {
-                http.current_user_application()
-                    .await?
-                    .model()
-                    .await
-                    .map_err(anyhow::Error::from)
-            },
-        )?;
-
-        tracing::info!(user = %user.name, "logged in successfully");
-
-        tracing::info!("connecting to db...");
-        let db = Database::connect(&config.db.uri).await?;
-
-        let crate_name = module_path!().split("::").next().unwrap();
-        let pattern = format!("{crate_name}::entity::*");
-
-        tracing::info!("syncing all db schema using pattern {}", pattern);
-        db.get_schema_registry(&pattern).sync(&db).await?;
-        tracing::info!("db schema successfully synced");
-
-        let gateway_config =
-            ConfigBuilder::new(config.bot.token.as_ref().to_string(), INTENTS).build();
-
-        let gateway_info = http.gateway().authed().await?.model().await?;
-        let total_shards = gateway_info.shards;
-
-        let poll_manager = Arc::new(PollManager::new(db.clone()));
-
-        context::init(app.id, http, config_manager, &db, &poll_manager);
-
-        let web_addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));
-        let web_handle = tokio::spawn(async move {
-            if let Err(err) = web::run(web_addr).await {
-                tracing::error!(error = %err, "web server stopped unexpectedly");
-            }
-        });
-
-        if sync_commands {
-            tracing::info!("syncing application commands...");
-            MANAGER
-                .register_commands()
+    let (user, app) = tokio::try_join!(
+        async {
+            http.current_user()
+                .await?
+                .model()
                 .await
-                .context("registering commands")?;
-            tracing::info!("application commands successfully synced");
+                .map_err(anyhow::Error::from)
+        },
+        async {
+            http.current_user_application()
+                .await?
+                .model()
+                .await
+                .map_err(anyhow::Error::from)
+        },
+    )?;
+
+    tracing::info!(user = %user.name, "logged in successfully");
+
+    tracing::info!("connecting to db...");
+    let db = Database::connect(&config.db.uri).await?;
+
+    let crate_name = module_path!().split("::").next().unwrap();
+    let pattern = format!("{crate_name}::entity::*");
+
+    tracing::info!("syncing all db schema using pattern {}", pattern);
+    db.get_schema_registry(&pattern).sync(&db).await?;
+    tracing::info!("db schema successfully synced");
+
+    let gateway_config = ConfigBuilder::new(config.bot.token.as_ref().to_string(), INTENTS).build();
+
+    let gateway_info = http.gateway().authed().await?.model().await?;
+    let total_shards = gateway_info.shards;
+
+    let poll_manager = Arc::new(PollManager::new(db.clone()));
+
+    context::init(app.id, http, config_manager, &db, &poll_manager);
+
+    let web_addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));
+    let web_handle = tokio::spawn(async move {
+        if let Err(err) = web::run(web_addr).await {
+            tracing::error!(error = %err, "web server stopped unexpectedly");
         }
+    });
 
-        if exit_after_sync {
-            tracing::info!("exit requested after sync operations; exiting");
-            return anyhow::Ok(());
-        }
+    if sync_commands {
+        tracing::info!("syncing application commands...");
+        MANAGER
+            .register_commands()
+            .await
+            .context("registering commands")?;
+        tracing::info!("application commands successfully synced");
+    }
 
-        poll_manager.start_tasks();
-        tracing::info!("poll expiration checker started");
+    if exit_after_sync {
+        tracing::info!("exit requested after sync operations; exiting");
+        return anyhow::Ok(());
+    }
 
-        let mut runners: Vec<_> = (0..total_shards)
-            .map(|shard_index| {
-                let shard_id = ShardId::new(shard_index, total_shards);
+    poll_manager.start_tasks();
+    tracing::info!("poll expiration checker started");
 
-                let shard = Shard::with_config(shard_id, gateway_config.clone());
+    let mut runners: Vec<_> = (0..total_shards)
+        .map(|shard_index| {
+            let shard_id = ShardId::new(shard_index, total_shards);
 
-                tokio::spawn(run_shard(shard))
-            })
-            .collect();
+            let shard = Shard::with_config(shard_id, gateway_config.clone());
 
-        runners.push(web_handle);
+            tokio::spawn(run_shard(shard))
+        })
+        .collect();
 
-        signal::ctrl_c().await?;
-        tracing::info!("shutting down; press CTRL-C to abort");
+    runners.push(web_handle);
 
-        for runner in runners {
-            runner.abort();
-        }
+    signal::ctrl_c().await?;
+    tracing::info!("shutting down; press CTRL-C to abort");
 
-        anyhow::Ok(())
-    })
+    for runner in runners {
+        runner.abort();
+    }
+
+    anyhow::Ok(())
 }
 
 async fn run_shard(mut shard: Shard) {

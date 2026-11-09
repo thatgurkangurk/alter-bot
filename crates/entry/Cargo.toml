@@ -13,3 +13,7 @@ tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 alterbot = { path = "../alterbot" }
 alterconfig = { path = "../alterconfig" }
 rustls = { default-features = false, version = "0.23.46", features = ["ring"] }
+opentelemetry = "0.33.1"
+opentelemetry_sdk = { version = "0.33.1", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.33.1", features = ["grpc-tonic", "logs"] }
+opentelemetry-appender-tracing = "0.33.1"

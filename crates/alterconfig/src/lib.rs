@@ -61,6 +61,12 @@ pub struct Config {
     pub db: DatabaseConfig,
     pub web: WebConfig,
     pub misc: Option<MiscConfig>,
+    pub otlp: Option<TelemetryConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TelemetryConfig {
+    pub url: String,
 }
 
 #[derive(Clone, Debug)]
