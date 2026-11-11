@@ -6,6 +6,7 @@ pub mod misc;
 pub mod ping;
 pub mod poll;
 pub mod quote;
+pub mod rock_paper_scissors;
 pub mod settings;
 pub mod welcome;
 
