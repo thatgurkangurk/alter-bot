@@ -3,10 +3,7 @@ use std::future::Future;
 use tracing::Instrument;
 use twilight_gateway::{ConfigBuilder, Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt};
 
-use crate::{
-    module::{Module, ModuleEntry},
-    module_manager::MANAGER,
-};
+use crate::{module::Module, module_manager::MANAGER, register_module};
 
 pub struct GatewayModule;
 
@@ -53,11 +50,7 @@ impl Module for GatewayModule {
     }
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &GatewayModule
-    }
-}
+register_module!(GatewayModule);
 
 async fn run_shard(mut shard: Shard) -> anyhow::Result<()> {
     while let Some(event) = shard.next_event(EVENT_TYPES).await {

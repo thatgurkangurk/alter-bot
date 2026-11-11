@@ -18,7 +18,8 @@ use super::poll_manager::CreatePollParams;
 use crate::{
     CTX, context,
     entity::{guild, guild_member, poll, vote},
-    module::{CommandScope, Module, ModuleCommand, ModuleEntry, poll::PollManager},
+    module::{CommandScope, Module, ModuleCommand, poll::PollManager},
+    register_module,
 };
 
 pub struct PollModule;
@@ -347,8 +348,4 @@ async fn send_followup(interaction: &InteractionCreate, content: &str) -> Result
     Ok(())
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &PollModule
-    }
-}
+register_module!(PollModule);

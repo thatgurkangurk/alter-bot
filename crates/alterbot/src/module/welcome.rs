@@ -1,7 +1,4 @@
-use crate::{
-    entity,
-    module::{Module, ModuleEntry},
-};
+use crate::{entity, module::Module, register_module};
 use twilight_model::{gateway::event::Event, id::Id};
 
 pub struct WelcomerModule;
@@ -50,8 +47,4 @@ impl Module for WelcomerModule {
     }
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &WelcomerModule
-    }
-}
+register_module!(WelcomerModule);

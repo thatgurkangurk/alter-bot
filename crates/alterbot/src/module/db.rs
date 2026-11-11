@@ -1,4 +1,4 @@
-use crate::module::{Module, ModuleEntry};
+use crate::{module::Module, register_module};
 use sea_orm::Database;
 
 pub struct DatabaseModule;
@@ -27,8 +27,4 @@ impl Module for DatabaseModule {
     }
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &DatabaseModule
-    }
-}
+register_module!(DatabaseModule);

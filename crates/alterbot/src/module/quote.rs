@@ -1,5 +1,6 @@
 use crate::{
-    module::{CommandScope, Module, ModuleCommand, ModuleEntry},
+    module::{CommandScope, Module, ModuleCommand},
+    register_module,
     util::get_avatar_url,
 };
 use twilight_model::{
@@ -124,8 +125,4 @@ impl Module for QuoteModule {
     }
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &QuoteModule
-    }
-}
+register_module!(QuoteModule);

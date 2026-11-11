@@ -65,3 +65,14 @@ pub struct ModuleEntry {
 }
 
 inventory::collect!(ModuleEntry);
+
+#[macro_export]
+macro_rules! register_module {
+    ($module:expr) => {
+        inventory::submit! {
+            $crate::module::ModuleEntry {
+                module: &$module
+            }
+        }
+    };
+}

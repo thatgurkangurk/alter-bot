@@ -1,6 +1,7 @@
 use crate::{
     entity,
-    module::{CommandScope, Module, ModuleCommand, ModuleEntry},
+    module::{CommandScope, Module, ModuleCommand},
+    register_module,
 };
 use anyhow::Result;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, IntoActiveModel};
@@ -157,8 +158,4 @@ impl Module for ServerSettingsModule {
     }
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &ServerSettingsModule
-    }
-}
+register_module!(ServerSettingsModule);

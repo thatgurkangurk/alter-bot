@@ -1,6 +1,7 @@
 use crate::{
     consts,
-    module::{CommandScope, Module, ModuleCommand, ModuleEntry},
+    module::{CommandScope, Module, ModuleCommand},
+    register_module,
     util::{get_avatar_url, get_bot_user, rgb_to_packed_u32},
 };
 use anyhow::Context;
@@ -93,8 +94,4 @@ impl Module for MiscModule {
     }
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &MiscModule
-    }
-}
+register_module!(MiscModule);

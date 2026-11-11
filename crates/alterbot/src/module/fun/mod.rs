@@ -1,4 +1,7 @@
-use crate::module::{Module, ModuleCommand, ModuleEntry, fun::xkcd::XKCD_COMMAND};
+use crate::{
+    module::{Module, ModuleCommand, fun::xkcd::XKCD_COMMAND},
+    register_module,
+};
 use anyhow::Context;
 use twilight_http::request::channel::reaction::RequestReactionType;
 use twilight_model::{
@@ -185,8 +188,4 @@ impl Module for FunModule {
     }
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &FunModule
-    }
-}
+register_module!(FunModule);

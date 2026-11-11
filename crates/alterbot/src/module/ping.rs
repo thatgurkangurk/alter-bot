@@ -7,7 +7,10 @@ use twilight_model::{
     http::interaction::{InteractionResponse, InteractionResponseData, InteractionResponseType},
 };
 
-use crate::module::{CommandScope, Module, ModuleCommand, ModuleEntry};
+use crate::{
+    module::{CommandScope, Module, ModuleCommand},
+    register_module,
+};
 
 pub struct PingModule;
 
@@ -58,8 +61,4 @@ impl Module for PingModule {
     }
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &PingModule
-    }
-}
+register_module!(PingModule);

@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use crate::module::{Module, ModuleEntry};
+use crate::{module::Module, register_module};
 
 pub struct WebModule;
 
@@ -27,8 +27,4 @@ impl Module for WebModule {
     }
 }
 
-inventory::submit! {
-    ModuleEntry {
-        module: &WebModule
-    }
-}
+register_module!(WebModule);
