@@ -53,6 +53,19 @@ impl ModuleManager {
         }
     }
 
+    pub async fn init(&self) -> anyhow::Result<()> {
+        for module in &self.modules {
+            tracing::info!(
+                module = %module.name(),
+                "registered"
+            );
+            module.init().await?;
+        }
+
+        tracing::info!(count = self.modules.len(), "total modules loaded");
+        Ok(())
+    }
+
     pub async fn register_commands(&self) -> anyhow::Result<()> {
         let interaction = crate::CTX.interaction();
 

@@ -174,6 +174,13 @@ impl Module for PollModule {
         "poll"
     }
 
+    async fn init(&self) -> Result<()> {
+        CTX.poll_manager.clone().start_tasks();
+        tracing::info!("poll expiration checker started");
+
+        Ok(())
+    }
+
     fn commands(&self) -> Vec<ModuleCommand> {
         vec![ModuleCommand {
             name: "poll",

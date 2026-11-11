@@ -107,8 +107,10 @@ pub async fn start_bot(
         return anyhow::Ok(());
     }
 
-    poll_manager.start_tasks();
-    tracing::info!("poll expiration checker started");
+    MANAGER
+        .init()
+        .await
+        .context("running init functions for modules")?;
 
     let mut runners: Vec<_> = (0..total_shards)
         .map(|shard_index| {

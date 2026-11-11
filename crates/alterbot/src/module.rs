@@ -48,6 +48,10 @@ pub trait Module: Send + Sync {
     async fn handle_event(&self, _event: &Event) -> anyhow::Result<()> {
         Ok(())
     }
+
+    async fn init(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 pub struct ModuleEntry {
