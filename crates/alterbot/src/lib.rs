@@ -86,13 +86,6 @@ pub async fn start_bot(
         http_client,
     );
 
-    let web_addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));
-    let web_handle = tokio::spawn(async move {
-        if let Err(err) = web::run(web_addr).await {
-            tracing::error!(error = %err, "web server stopped unexpectedly");
-        }
-    });
-
     if sync_commands {
         tracing::info!("syncing application commands...");
         MANAGER
@@ -112,7 +105,7 @@ pub async fn start_bot(
         .await
         .context("running init functions for modules")?;
 
-    let mut runners: Vec<_> = (0..total_shards)
+    let runners: Vec<_> = (0..total_shards)
         .map(|shard_index| {
             let shard_id = ShardId::new(shard_index, total_shards);
 
@@ -121,8 +114,6 @@ pub async fn start_bot(
             tokio::spawn(run_shard(shard))
         })
         .collect();
-
-    runners.push(web_handle);
 
     signal::ctrl_c().await?;
     tracing::info!("shutting down; press CTRL-C to abort");

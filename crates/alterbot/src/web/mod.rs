@@ -1,4 +1,5 @@
 pub mod middleware;
+mod module;
 pub mod routes;
 
 use anyhow::Context;
