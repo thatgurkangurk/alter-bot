@@ -39,8 +39,7 @@ pub async fn run(
     let interaction_id = interaction.id;
     let token = &interaction.token;
 
-    crate::CTX
-        .http
+    crate::context::http()
         .interaction(interaction.application_id)
         .create_response(
             interaction_id,

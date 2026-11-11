@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -16,9 +16,9 @@ use twilight_model::{
 
 use super::poll_manager::CreatePollParams;
 use crate::{
-    CTX,
+    CTX, context,
     entity::{guild, guild_member, poll, vote},
-    module::{CommandScope, Module, ModuleCommand, ModuleEntry},
+    module::{CommandScope, Module, ModuleCommand, ModuleEntry, poll::PollManager},
 };
 
 pub struct PollModule;
@@ -100,11 +100,11 @@ pub async fn run(interaction: Box<InteractionCreate>, data: Box<CommandData>) ->
 
         defer_ephemeral(&interaction).await?;
 
-        guild::Entity::get_or_initialise(&CTX.database, guild_id)
+        guild::Entity::get_or_initialise(crate::context::db(), guild_id)
             .await
             .context("failed to initialize guild record")?;
 
-        guild_member::Entity::get_or_initialise(&CTX.database, guild_id, user.id)
+        guild_member::Entity::get_or_initialise(crate::context::db(), guild_id, user.id)
             .await
             .context("failed to initialize guild member record")?;
 
@@ -150,7 +150,10 @@ pub async fn run(interaction: Box<InteractionCreate>, data: Box<CommandData>) ->
             end_time,
         };
 
-        match CTX.poll_manager.create_poll(create_params).await {
+        match crate::context::poll_manager()
+            .create_poll(create_params)
+            .await
+        {
             Ok(_) => send_followup(&interaction, "poll created successfully!").await?,
             Err(err) => {
                 tracing::error!(error = ?err, "failed to create poll");
@@ -174,8 +177,18 @@ impl Module for PollModule {
         "poll"
     }
 
+    fn depends_on(&self) -> &'static [&'static str] {
+        &["database"]
+    }
+
     async fn init(&self) -> Result<()> {
-        CTX.poll_manager.clone().start_tasks();
+        let db = crate::context::db().clone();
+        let poll_manager = Arc::new(PollManager::new(db));
+
+        crate::context::set_poll_manager(Arc::clone(&poll_manager));
+
+        poll_manager.start_tasks();
+
         tracing::info!("poll expiration checker started");
 
         Ok(())
@@ -238,17 +251,17 @@ impl Module for PollModule {
                 return Ok(());
             };
 
-            guild::Entity::get_or_initialise(&CTX.database, guild_id)
+            guild::Entity::get_or_initialise(context::db(), guild_id)
                 .await
                 .context("failed to initialise guild")?;
 
-            guild_member::Entity::get_or_initialise(&CTX.database, guild_id, user_id)
+            guild_member::Entity::get_or_initialise(context::db(), guild_id, user_id)
                 .await
                 .context("failed to initialise guild member")?;
 
             let message_id = message.id.get() as i64;
             let poll_option = poll::Entity::find_by_id(message_id)
-                .one(&CTX.database)
+                .one(context::db())
                 .await
                 .context("failed to query poll")?;
 
@@ -262,11 +275,11 @@ impl Module for PollModule {
                 return Ok(());
             }
 
-            vote::Entity::cast_vote(&CTX.database, message.id, user_id, choice)
+            vote::Entity::cast_vote(context::db(), message.id, user_id, choice)
                 .await
                 .context("failed to cast vote")?;
 
-            if let Err(err) = CTX.poll_manager.update_poll_embed(message_id).await {
+            if let Err(err) = context::poll_manager().update_poll_embed(message_id).await {
                 tracing::error!(error = ?err, "failed to update poll embed after vote");
             }
 

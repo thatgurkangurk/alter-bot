@@ -63,7 +63,7 @@ pub struct XkcdLatestCommand;
 
 impl XkcdLatestCommand {
     pub async fn run(&self, interaction: Interaction) -> anyhow::Result<()> {
-        let comic = XkcdEntry::get_latest(&CTX.http_client).await?;
+        let comic = XkcdEntry::get_latest(crate::context::http_client()).await?;
         let embed = crate_comic_embed(comic)?;
 
         let response = ChannelMessageBuilder::new().embeds([embed]).build();
@@ -82,7 +82,7 @@ pub struct XkcdRandomCommand;
 
 impl XkcdRandomCommand {
     pub async fn run(&self, interaction: Interaction) -> anyhow::Result<()> {
-        let comic = XkcdEntry::get_random(&CTX.http_client).await?;
+        let comic = XkcdEntry::get_random(crate::context::http_client()).await?;
         let embed = crate_comic_embed(comic)?;
 
         let response = ChannelMessageBuilder::new().embeds([embed]).build();
@@ -104,7 +104,8 @@ pub struct XkcdNumberCommand {
 
 impl XkcdNumberCommand {
     pub async fn run(&self, interaction: Interaction) -> anyhow::Result<()> {
-        let comic = XkcdEntry::get_number(&CTX.http_client, self.number.try_into()?).await?;
+        let comic =
+            XkcdEntry::get_number(crate::context::http_client(), self.number.try_into()?).await?;
 
         let response = match comic {
             Some(comic) => ChannelMessageBuilder::new().embeds([crate_comic_embed(comic)?]),

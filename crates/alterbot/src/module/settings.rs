@@ -88,11 +88,11 @@ pub async fn run(interaction: Box<InteractionCreate>, data: Box<CommandData>) ->
             let db_channel_id = channel_id.get() as i64;
 
             let db_guild =
-                entity::guild::Entity::get_or_initialise(&crate::CTX.database, guild_id).await?;
+                entity::guild::Entity::get_or_initialise(crate::context::db(), guild_id).await?;
 
             let mut active_guild: entity::guild::ActiveModel = db_guild.into_active_model();
             active_guild.welcome_channel_id = Set(Some(db_channel_id));
-            active_guild.update(&crate::CTX.database).await?;
+            active_guild.update(crate::context::db()).await?;
 
             send_ephemeral_response(
                 &interaction,
@@ -105,11 +105,11 @@ pub async fn run(interaction: Box<InteractionCreate>, data: Box<CommandData>) ->
             let db_channel_id = channel_id.get() as i64;
 
             let db_guild =
-                entity::guild::Entity::get_or_initialise(&crate::CTX.database, guild_id).await?;
+                entity::guild::Entity::get_or_initialise(crate::context::db(), guild_id).await?;
 
             let mut active_guild: entity::guild::ActiveModel = db_guild.into_active_model();
             active_guild.poll_log_channel_id = Set(Some(db_channel_id));
-            active_guild.update(&crate::CTX.database).await?;
+            active_guild.update(crate::context::db()).await?;
 
             send_ephemeral_response(
                 &interaction,

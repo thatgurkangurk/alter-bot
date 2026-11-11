@@ -22,10 +22,7 @@ use twilight_util::builder::embed::{
     EmbedAuthorBuilder, EmbedBuilder, EmbedFooterBuilder, ImageSource,
 };
 
-use crate::{
-    CTX,
-    entity::{guild as server, poll, vote},
-};
+use crate::entity::{guild as server, poll, vote};
 
 pub struct CreatePollParams {
     pub channel_id: Id<ChannelMarker>,
@@ -62,9 +59,9 @@ impl PollManager {
         }
     }
 
-    pub fn start_tasks(self: Arc<Self>) {
-        let manager_sec = Arc::clone(&self);
-        let manager_sync = Arc::clone(&self);
+    pub fn start_tasks(self: &Arc<Self>) {
+        let manager_sec = Arc::clone(self);
+        let manager_sync = Arc::clone(self);
 
         tokio::spawn(async move {
             let mut ticker = interval(Duration::from_secs(1));
@@ -152,8 +149,7 @@ impl PollManager {
         });
         let components = build_poll_buttons(false);
 
-        let msg = CTX
-            .http
+        let msg = crate::context::http()
             .create_message(params.channel_id)
             .embeds(&[embed])
             .components(&components)
@@ -220,8 +216,7 @@ impl PollManager {
         });
         let components = build_poll_buttons(false);
 
-        let _ = CTX
-            .http
+        let _ = crate::context::http()
             .update_message(poll.channel_id(), poll.message_id())
             .embeds(Some(&[embed]))
             .components(Some(&components))
@@ -262,8 +257,7 @@ impl PollManager {
         });
         let components = build_poll_buttons(true);
 
-        let _ = CTX
-            .http
+        let _ = crate::context::http()
             .update_message(poll.channel_id(), poll.message_id())
             .embeds(Some(&[embed]))
             .components(Some(&components))
@@ -327,8 +321,7 @@ impl PollManager {
                 .expect("valid embed parameters")
                 .build();
 
-            let _ = CTX
-                .http
+            let _ = crate::context::http()
                 .create_message(target_channel)
                 .embeds(&[log_embed])
                 .await;
@@ -446,8 +439,7 @@ async fn fetch_member_display_info(
     user_id: Id<UserMarker>,
 ) -> (String, Option<ImageHash>) {
     let get_member = || async {
-        let member = CTX
-            .http
+        let member = crate::context::http()
             .guild_member(guild_id, user_id)
             .await
             .ok()?
@@ -462,7 +454,13 @@ async fn fetch_member_display_info(
     };
 
     let get_user = || async {
-        let user = CTX.http.user(user_id).await.ok()?.model().await.ok()?;
+        let user = crate::context::http()
+            .user(user_id)
+            .await
+            .ok()?
+            .model()
+            .await
+            .ok()?;
         let display_name = user.global_name.unwrap_or(user.name);
         Some((display_name, user.avatar))
     };

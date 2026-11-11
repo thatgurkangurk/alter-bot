@@ -1,5 +1,5 @@
 use crate::{
-    CTX, entity,
+    entity,
     module::{Module, ModuleEntry},
 };
 use twilight_model::gateway::event::Event;
@@ -15,7 +15,7 @@ impl Module for GuildModule {
     async fn handle_event(&self, event: &Event) -> anyhow::Result<()> {
         if let Event::GuildCreate(guild) = event {
             let db_guild =
-                entity::guild::Entity::get_or_initialise(&CTX.database, guild.id()).await?;
+                entity::guild::Entity::get_or_initialise(crate::context::db(), guild.id()).await?;
             tracing::info!(
                 guild_id = %db_guild.id,
                 "new guild!"

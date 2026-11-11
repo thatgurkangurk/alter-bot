@@ -103,8 +103,7 @@ impl Module for FunModule {
                     return Ok(());
                 };
 
-                let current_user = crate::CTX
-                    .cache
+                let current_user = crate::context::cache()
                     .current_user()
                     .context("current user missing from cache")?;
 
@@ -117,8 +116,7 @@ impl Module for FunModule {
 
                 let content = format!("Hi {}, I'm {}!", name, bot_name);
 
-                crate::CTX
-                    .http
+                crate::context::http()
                     .create_message(msg.channel_id)
                     .content(&content)
                     .reply(msg.id)
@@ -143,8 +141,7 @@ impl Module for FunModule {
                 };
 
                 let delete_reaction = async {
-                    crate::CTX
-                        .http
+                    crate::context::http()
                         .delete_reaction(
                             reaction.channel_id,
                             reaction.message_id,
@@ -154,7 +151,7 @@ impl Module for FunModule {
                         .await
                 };
 
-                let config = crate::CTX.config_manager.get_sync();
+                let config = crate::context::config();
                 let Some(misc) = &config.misc else {
                     delete_reaction.await?;
                     return Ok(());

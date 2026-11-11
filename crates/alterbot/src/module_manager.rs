@@ -1,5 +1,6 @@
-use crate::module::{CommandScope, ModuleEntry};
-use std::collections::HashMap;
+use crate::module::{CommandScope, Module, ModuleEntry};
+use anyhow::{Context, anyhow};
+use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 use twilight_model::{
     application::interaction::{InteractionData, InteractionType},
@@ -54,15 +55,19 @@ impl ModuleManager {
     }
 
     pub async fn init(&self) -> anyhow::Result<()> {
-        for module in &self.modules {
-            tracing::info!(
-                module = %module.name(),
-                "registered"
-            );
-            module.init().await?;
+        let entries: Vec<&'static dyn Module> =
+            inventory::iter::<ModuleEntry>().map(|e| e.module).collect();
+
+        let sorted_modules = sort_modules_topologically(entries)?;
+
+        for module in sorted_modules {
+            tracing::info!(module = %module.name(), "initialising module");
+            module
+                .init()
+                .await
+                .with_context(|| format!("failed to initialise module '{}'", module.name()))?;
         }
 
-        tracing::info!(count = self.modules.len(), "total modules loaded");
         Ok(())
     }
 
@@ -125,4 +130,59 @@ impl ModuleManager {
             }
         }
     }
+}
+
+fn sort_modules_topologically(
+    modules: Vec<&'static dyn Module>,
+) -> anyhow::Result<Vec<&'static dyn Module>> {
+    let mut map: HashMap<&'static str, &'static dyn Module> = HashMap::new();
+    for module in modules {
+        if map.insert(module.name(), module).is_some() {
+            return Err(anyhow!("duplicate module name found: '{}'", module.name()));
+        }
+    }
+
+    let mut sorted = Vec::new();
+    let mut visited = HashSet::new();
+    let mut visiting = HashSet::new();
+
+    fn visit<'a>(
+        name: &'a str,
+        map: &HashMap<&'static str, &'a dyn Module>,
+        visited: &mut HashSet<&'a str>,
+        visiting: &mut HashSet<&'a str>,
+        sorted: &mut Vec<&'a dyn Module>,
+    ) -> anyhow::Result<()> {
+        if visiting.contains(name) {
+            return Err(anyhow!(
+                "circular module dependency detected involving: '{name}'"
+            ));
+        }
+
+        if !visited.contains(name) {
+            visiting.insert(name);
+
+            let module = map
+                .get(name)
+                .ok_or_else(|| anyhow!("missing module dependency: '{name}'"))?;
+
+            for &dep in module.depends_on() {
+                visit(dep, map, visited, visiting, sorted)?;
+            }
+
+            visiting.remove(name);
+            visited.insert(name);
+            sorted.push(*module);
+        }
+
+        Ok(())
+    }
+
+    for &name in map.keys() {
+        if !visited.contains(name) {
+            visit(name, &map, &mut visited, &mut visiting, &mut sorted)?;
+        }
+    }
+
+    Ok(sorted)
 }

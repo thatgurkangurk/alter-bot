@@ -1,4 +1,6 @@
+pub mod db;
 pub mod fun;
+pub mod gateway;
 pub mod guild;
 pub mod misc;
 pub mod ping;
@@ -43,6 +45,10 @@ pub trait Module: Send + Sync {
 
     fn commands(&self) -> Vec<ModuleCommand> {
         Vec::new()
+    }
+
+    fn depends_on(&self) -> &'static [&'static str] {
+        &[]
     }
 
     async fn handle_event(&self, _event: &Event) -> anyhow::Result<()> {

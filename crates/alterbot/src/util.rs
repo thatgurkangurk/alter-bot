@@ -1,4 +1,3 @@
-use crate::CTX;
 use anyhow::Context;
 use twilight_model::{
     id::{Id, marker::UserMarker},
@@ -17,12 +16,11 @@ pub fn rgb_to_packed_u32(r: u8, g: u8, b: u8) -> u32 {
 }
 
 pub async fn get_bot_user() -> anyhow::Result<CurrentUser> {
-    if let Some(user) = CTX.cache.current_user() {
+    if let Some(user) = crate::context::cache().current_user() {
         return Ok(user);
     }
 
-    let user = CTX
-        .http
+    let user = crate::context::http()
         .current_user()
         .await
         .context("fetching current user")?

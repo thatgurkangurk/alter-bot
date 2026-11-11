@@ -5,10 +5,7 @@ use twilight_model::id::{
     marker::{ChannelMarker, MessageMarker},
 };
 
-use crate::{
-    CTX,
-    web::error::{AppError, AppResult},
-};
+use crate::web::error::{AppError, AppResult};
 
 #[derive(Debug, Deserialize)]
 pub struct MessageRequest {
@@ -39,7 +36,9 @@ pub async fn send_message_handler(
         .map(Id::new)
         .map_err(|_| AppError::BadRequest("invalid channel_id format".into()))?;
 
-    let mut create_msg = CTX.http.create_message(channel_id).content(&body.message);
+    let mut create_msg = crate::context::http()
+        .create_message(channel_id)
+        .content(&body.message);
 
     if let Some(reply_id_str) = body.reply_to_id {
         let reply_id: Id<MessageMarker> = reply_id_str

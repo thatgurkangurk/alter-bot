@@ -10,6 +10,10 @@ impl Module for WebModule {
         "web"
     }
 
+    fn depends_on(&self) -> &'static [&'static str] {
+        &["database"]
+    }
+
     async fn init(&self) -> anyhow::Result<()> {
         let web_addr = SocketAddr::from(([0, 0, 0, 0], 3000));
 

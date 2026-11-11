@@ -5,8 +5,6 @@ use axum::{
     response::Response,
 };
 
-use crate::CTX;
-
 pub async fn require_bearer_auth(
     req: Request,
     next: Next,
@@ -26,7 +24,7 @@ pub async fn require_bearer_auth(
         }
     };
 
-    let config = CTX.config_manager.get().await;
+    let config = crate::context::config();
     let is_authorized = config.web.tokens.iter().any(|t| t == token);
 
     if !is_authorized {
