@@ -105,6 +105,7 @@ dependencies = [
  "craftping",
  "dashmap",
  "either",
+ "fastrand",
  "ferinth",
  "futures",
  "humantime",

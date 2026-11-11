@@ -1,5 +1,6 @@
 use crate::{cache::Cache, module::poll::PollManager};
 use alterconfig::ConfigManager;
+use reqwest::Client as ReqwestClient;
 use sea_orm::DatabaseConnection;
 use std::{
     ops::Deref,
@@ -19,6 +20,7 @@ pub struct Context {
     pub config_manager: ConfigManager,
     pub database: DatabaseConnection,
     pub poll_manager: Arc<PollManager>,
+    pub http_client: ReqwestClient,
 }
 
 impl Context {
@@ -33,8 +35,10 @@ pub fn init(
     config_manager: ConfigManager,
     database: &DatabaseConnection,
     poll_manager: &Arc<PollManager>,
+    http_client: ReqwestClient,
 ) {
     let context = Context {
+        http_client,
         application_id,
         http,
         poll_manager: Arc::clone(poll_manager),

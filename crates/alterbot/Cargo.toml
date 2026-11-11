@@ -48,3 +48,4 @@ sea-orm = { version = "2.0", features = [
 axum = "0.8.9"
 tower-http = { version = "0.7.1", features = ["cors", "trace"] }
 humantime = "2.4.0"
+fastrand = "2.5.0"

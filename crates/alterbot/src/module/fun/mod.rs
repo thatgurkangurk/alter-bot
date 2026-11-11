@@ -1,4 +1,4 @@
-use crate::module::{Module, ModuleEntry};
+use crate::module::{Module, ModuleCommand, ModuleEntry, fun::xkcd::XKCD_COMMAND};
 use anyhow::Context;
 use twilight_http::request::channel::reaction::RequestReactionType;
 use twilight_model::{
@@ -6,6 +6,8 @@ use twilight_model::{
     gateway::event::Event,
     id::{Id, marker::EmojiMarker},
 };
+
+mod xkcd;
 
 pub struct FunModule;
 
@@ -179,6 +181,10 @@ impl Module for FunModule {
         }
 
         Ok(())
+    }
+
+    fn commands(&self) -> Vec<ModuleCommand> {
+        vec![XKCD_COMMAND]
     }
 }
 

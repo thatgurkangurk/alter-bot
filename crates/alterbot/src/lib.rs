@@ -14,6 +14,7 @@ use crate::{module::poll::PollManager, module_manager::MANAGER};
 pub use context::CTX;
 
 use anyhow::Context as _;
+use reqwest::ClientBuilder;
 use sea_orm::Database;
 use tokio::signal;
 use tracing::{Instrument as _, instrument::Instrumented};
@@ -72,7 +73,18 @@ pub async fn start_bot(
 
     let poll_manager = Arc::new(PollManager::new(db.clone()));
 
-    context::init(app.id, http, config_manager, &db, &poll_manager);
+    let http_client = ClientBuilder::new()
+        .build()
+        .context("failed to build reqwest client")?;
+
+    context::init(
+        app.id,
+        http,
+        config_manager,
+        &db,
+        &poll_manager,
+        http_client,
+    );
 
     let web_addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));
     let web_handle = tokio::spawn(async move {
